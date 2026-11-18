@@ -259,3 +259,59 @@ describe("change notifications", () => {
     assert.equal(calls, 4);
   });
 });
+
+describe("review fixes", () => {
+  const ctx = (data: Partial<typeof DATA>, env = ENV.desktop!) => ctxFor(env, data);
+
+  test("clipping never splits an emoji (no URIError, widget keeps rendering)", () => {
+    const cases: [string, Partial<typeof DATA>][] = [
+      ["hackernews", { title: "a".repeat(78) + "🎉 party night" }],
+      ["reddit", { title: "b".repeat(298) + "😀xyz" }],
+      ["teams", { title: "c".repeat(198) + "😀xyz", text: "" }],
+      ["pinterest", { title: "d".repeat(498) + "😀xyz", text: "" }],
+    ];
+    for (const [id, data] of cases) {
+      const url = resolveTargetHref(getShareTarget(id)!, ctx(data));
+      assert.ok(url, id);
+      assert.doesNotThrow(() => decodeURIComponent(url!), id);
+    }
+    for (let n = 150; n < 220; n++) {
+      const scheme = resolveAppScheme(getShareTarget("viber")!.app, ctx({ title: "😀".repeat(n), text: "" }, ENV.ios!));
+      assert.ok(scheme?.startsWith("viber://forward?text="), `viber ${n}`);
+      assert.ok(Array.from(decodeURIComponent(scheme!.slice(21))).length <= 200);
+    }
+  });
+
+  test("a target whose href or app function throws is skipped, not fatal", () => {
+    const c = ctx({});
+    assert.equal(resolveTargetHref({ id: "boom", label: "x", href: () => { throw new Error("x"); } }, c), null);
+    assert.equal(resolveAppScheme(() => { throw new Error("x"); }, c), null);
+  });
+
+  test("relative hrefs resolve against the page; without a page they are dropped", async () => {
+    const { safeHref } = await import("../src/core/targets.ts");
+    assert.equal(safeHref("/share?x=1"), null); // no document in Node
+    const g = globalThis as { document?: unknown };
+    g.document = { baseURI: "https://site.example/a/b" };
+    try {
+      assert.equal(safeHref("/share?x=1"), "https://site.example/share?x=1");
+      assert.equal(safeHref("javascript:alert(1)"), null);
+      assert.equal(safeHref("weixin://"), "weixin://");
+    } finally {
+      delete g.document;
+    }
+  });
+
+  test("Android WebViews and more in-app browsers are detected", async () => {
+    const { detectEnv } = await import("../src/core/env.ts");
+    const wv = "Mozilla/5.0 (Linux; Android 14; Pixel 8 Build/AP2A; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/130.0.0.0 Mobile Safari/537.36";
+    assert.equal(detectEnv(wv).inAppBrowser, true);
+    assert.equal(detectEnv("Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 KAKAOTALK 10.8.0").inAppBrowser, true);
+    assert.equal(detectEnv("Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36").inAppBrowser, false);
+  });
+
+  test("KakaoTalk on Android uses the launch host; rednote label", () => {
+    assert.equal(resolveAppScheme(getShareTarget("kakaotalk")!.app, ctx({}, ENV.android!)), "intent://launch#Intent;scheme=kakaotalk;package=com.kakao.talk;end");
+    assert.equal(targetLabel(getShareTarget("xiaohongshu")!, "en"), "rednote");
+  });
+});

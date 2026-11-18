@@ -40,10 +40,10 @@ Services change these links without notice. Re-run `npm run check-targets` to re
 | Flipboard | `flipboard` | Link — `share.flipboard.com/bookmarklet/popout` | all | medium | confirmed |
 | WeChat 微信 | `wechat` | Copy message, then open WeChat; QR code on computers; ··· hint inside WeChat | all | medium | confirmed |
 | Weibo 微博 | `weibo` | Link — `service.weibo.com/share/share.php` | all | high | confirmed |
-| QQ | `qq` | Copy message, then open QQ; QR code on computers | all | high | confirmed |
+| QQ | `qq` | Copy message, then open QQ; QR code on computers | all | medium | confirmed |
 | Qzone QQ空间 | `qzone` | Link — `sns.qzone.qq.com/cgi-bin/qzshare/cgi_qzshare_onekey` | all | medium | confirmed |
 | Douban 豆瓣 | `douban` | Link — `douban.com/share/service` | all | medium | corrected |
-| RED 小红书 | `xiaohongshu` | Copy message, then open Xiaohongshu | phones | medium | confirmed |
+| rednote 小红书 | `xiaohongshu` | Copy message, then open Xiaohongshu | phones | medium | confirmed |
 | Douyin 抖音 | `douyin` | Copy message, then open Douyin | phones | medium | confirmed |
 | Zhihu 知乎 | `zhihu` | Copy message, then open Zhihu | phones | low | confirmed |
 | DingTalk 钉钉 | `dingtalk` | Copy link, then open it inside DingTalk | all | medium | uncertain |
@@ -78,7 +78,7 @@ Sources: <https://core.telegram.org/widgets/share>, <https://t.me/.well-known/ap
 
 ### LINE (`line`)
 
-Needs a LINE web login, which is clumsy on desktop for people who mainly use the phone app. LINE's docs show the URL only after you accept the LINE Social Plugins usage guidelines, so read those before using LINE branding. On phones, prefer the line-app entry (line.me/R/share), which opens the app directly.
+Needs a LINE web login, which is clumsy on desktop for people who mainly use the phone app. LINE's docs show the URL only after you accept the LINE Social Plugins usage guidelines, so read those before using LINE branding. The widget uses this plugin on computers only; on phones it uses `line.me/R/share?text=` (documented in LINE's URL-scheme docs), which opens the app's "Share with" picker directly.
 
 Sources: <https://developers.line.biz/en/docs/line-social-plugins/install-guide/using-line-share-buttons/>, <https://github.com/nygardk/react-share/blob/main/src/LineShareButton.tsx>
 
@@ -108,7 +108,7 @@ Sources: <https://developers.viber.com/docs/tools/share-button/>, <https://githu
 
 ### KakaoTalk (`kakaotalk`)
 
-Copy-open only: the user has to paste and pick a chat. kakaotalk://launch isn't documented by Kakao and wasn't checked on iOS or Android devices. Fallback: offer an optional SDK mode when the host page supplies a Kakao JS key and has its domain registered. Monthly and daily quotas apply to SDK sharing.
+Copy-open only: the user has to paste and pick a chat. The widget opens `kakaotalk://` on iOS and `intent://launch#Intent;scheme=kakaotalk;package=com.kakao.talk;end` on Android (Play Store if KakaoTalk is missing). Neither is documented by Kakao (the `launch` host comes from the Android app's URL table) and neither was checked on a device. Fallback: offer an optional SDK mode when the host page supplies a Kakao JS key and has its domain registered. Monthly and daily quotas apply to SDK sharing.
 
 Sources: <https://developers.kakao.com/docs/en/kakaotalk-share/js-link>, <https://developers.kakao.com/docs/en/kakaotalk-share/common>, <https://developers.kakao.com/docs/en/javascript/hybrid>
 
@@ -246,9 +246,9 @@ Sources: <https://github.com/heiseonline/shariff/blob/master/src/js/services/fli
 
 ### WeChat 微信 (`wechat`)
 
-WeChat's official mini-program URL Scheme doc says weixin:// links can be opened from web pages outside WeChat by setting location.href. iOS recognizes the scheme directly; Android needs an H5 page that does location.href, which is our case. The call can run on page load or after a user action. iOS Safari shows an '在"微信"中打开？' confirmation. Inside WeChat itself, detect /MicroMessenger/i and tell…
+No web pre-fill without WeChat's JS-SDK (service account, registered domain, server signature — and it only sets the card for WeChat's own ··· menu). On phones the widget copies the message and opens `weixin://` (iOS) or `intent://#Intent;scheme=weixin;package=com.tencent.mm;end` (Android). The `weixin` scheme is confirmed by WeChat's Open SDK iOS guide (apps list it in LSApplicationQueriesSchemes); a bare `weixin://` on Android is undocumented and untested on a device, hence the intent URL with a Play Store fallback. iOS Safari asks '在"微信"中打开？' first. Inside WeChat the widget shows the ··· hint instead; on computers it copies the link and shows the QR code.
 
-Sources: <https://developers.weixin.qq.com/miniprogram/dev/framework/open-ability/url-scheme.html>, <https://developers.weixin.qq.com/doc/service/en/guide/h5/jssdk.html>
+Sources: <https://developers.weixin.qq.com/doc/oplatform/Mobile_App/Access_Guide/iOS.html>, <https://developers.weixin.qq.com/doc/service/en/guide/h5/jssdk.html>
 
 ### Weibo 微博 (`weibo`)
 
@@ -258,9 +258,9 @@ Sources: <https://service.weibo.com/share/share.php?url=…>, <https://open.weib
 
 ### QQ (`qq`)
 
-This is no longer a share form, only a branded QR code for mobile QQ to scan. It largely repeats the widget's own QR feature. Show it on desktop only. On phones it is a dead end (a QR code on the same screen), so use the 'qq-app' copy-open entry there.
+QQ's web share page (`connect.qq.com/widget/shareqq`) now only shows a QR code for mobile QQ, which the widget's own QR code already does. So on computers the widget copies the link and shows its QR code; on phones it copies the message and opens `mqq://` (iOS) or `intent://#Intent;scheme=mqq;package=com.tencent.mobileqq;end` (Android). `mqq://` is listed in the QQ Connect iOS SDK setup (LSApplicationQueriesSchemes); launching it was not tested on a device. URL schemes are usually blocked inside the WeChat, Weibo and Douyin in-app browsers — the widget only copies there.
 
-Sources: <https://connect.qq.com/widget/shareqq/index.html?url=…>, <https://wiki.connect.qq.com/>
+Sources: <https://wiki.connect.qq.com/ios_sdk%E7%8E%AF%E5%A2%83%E6%90%AD%E5%BB%BA>, <https://connect.qq.com/widget/shareqq/index.html?url=…>
 
 ### Qzone QQ空间 (`qzone`)
 
@@ -274,7 +274,7 @@ There is a login wall, and I could not see the share form after login. The docs 
 
 Sources: <https://www.douban.com/service/sharebutton>, <https://www.douban.com/share/service?…>
 
-### RED 小红书 (`xiaohongshu`)
+### rednote 小红书 (`xiaohongshu`)
 
 On iOS inside WeChat or QQ, the official SDK uses the universal link instead of the scheme. So https://oia.xiaohongshu.com/oia?deeplink=xhsdiscover%3A%2F%2Fhome is a sensible iOS alternative that may open from in-app browsers where schemes are blocked (not tested on a device). Opening the scheme lands on the home feed. Full pre-fill needs the SDK, an appKey and server signing, which a zero-config…
 

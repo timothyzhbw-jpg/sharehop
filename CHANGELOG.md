@@ -10,7 +10,7 @@
 - Copy-then-open copies synchronously inside the tap, so the copy survives the switch to the app.
 - New `share-widget.lite.global.js` build without brand logos.
 - `npm run check-targets` maintenance script.
-- Breaking (pre-1.0): `labels.whatsapp` / `labels.email` removed (app names come from targets); `shareTargetUrl()` returns `null` for unknown ids; `ShareEnvironment` gained `ios` / `android`.
+- Breaking (pre-1.0): `labels.whatsapp` / `labels.email` removed (app names come from targets); `SHARE_TARGETS` and `ShareTargetId` removed (use `listShareTargets()` / `string`); `shareTargetUrl()` returns `string | null`; `ShareEnvironment` gained `ios` / `android`; `copyText()` takes an optional container.
 
 ## 0.1.0 — unreleased
 

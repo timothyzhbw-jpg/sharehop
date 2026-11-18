@@ -73,15 +73,14 @@ svg { display: block; flex: none; }
 }
 .close:hover { background: var(--_hover); }
 
-.card { container-type: inline-size; }
+.card { min-width: min(100%, 300px); }
+/* As many columns as fit (about 4 on a phone, more on wide cards); a few
+   buttons stretch across the full width. */
 .actions {
   display: grid;
-  grid-template-columns: repeat(var(--sw-cols, 4), minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
   gap: 4px;
   margin: 16px -8px 8px;
-}
-@container (min-width: 600px) {
-  .actions { grid-template-columns: repeat(var(--sw-cols-wide, 6), minmax(0, 1fr)); }
 }
 .action {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
@@ -118,6 +117,8 @@ svg { display: block; flex: none; }
 .url {
   display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1;
   color: var(--_muted); text-decoration: none;
+  /* A long link must not set the widget's minimum width (it would overflow grid/flex columns). */
+  contain: inline-size;
 }
 .url:hover .url-text { text-decoration: underline; }
 .url-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -158,17 +159,19 @@ dialog {
 dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
 dialog .card { box-shadow: 0 24px 64px rgba(0, 0, 0, 0.25); }
 
-/* WeChat hint */
-.wx-hint {
-  position: fixed; inset: 0; z-index: 2147483647;
-  display: flex; flex-direction: column; align-items: flex-end; gap: 16px;
+/* WeChat / ··· menu hint: a modal <dialog>, so it is in the top layer above everything. */
+dialog.wx-hint {
+  position: fixed; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none;
+  margin: 0; border: 0; border-radius: 0; overflow: hidden;
   padding: 12px 20px 20px; background: rgba(0, 0, 0, 0.82); color: #fff; text-align: right;
 }
+dialog.wx-hint[open] { display: flex; flex-direction: column; align-items: flex-end; gap: 16px; }
+dialog.wx-hint::backdrop { background: transparent; }
 .wx-hint p { margin: 0; max-width: 300px; font-size: 18px; line-height: 1.5; }
 .wx-hint .pill { background: #fff; color: #111; margin-top: 8px; }
 
 @media (max-width: 640px) {
-  dialog { width: 100vw; margin: auto 0 0; max-height: 90dvh; }
+  dialog:not(.wx-hint) { width: 100vw; margin: auto 0 0; max-height: 90dvh; }
   dialog .card {
     border-radius: var(--sw-radius, 24px) var(--sw-radius, 24px) 0 0; border-bottom: 0;
     padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));

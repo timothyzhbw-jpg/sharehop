@@ -78,6 +78,12 @@ export class ShareWidgetElement extends Base {
   #timers = new Map<Element, ReturnType<typeof setTimeout>>();
   #unsubscribe: (() => void) | null = null;
   #renderQueued = false;
+  /** Targets as rendered, by data-target id — clicks run exactly what was shown. */
+  #rendered = new Map<string, ShareTarget>();
+  /** Set while #render() replaces the markup, so the old dialog's close isn't reported. */
+  #rerendering = false;
+  /** Element that opened the full-screen hint, to refocus when it closes. */
+  #hintOpener: HTMLElement | null = null;
 
   constructor() {
     super();
@@ -107,13 +113,15 @@ export class ShareWidgetElement extends Base {
       validateTarget(target);
       next.set(target.id, target);
     }
+    const same =
+      next.size === this.#targets.size && [...next].every(([id, target]) => this.#targets.get(id) === target);
     this.#targets = next;
-    if (this.isConnected) this.#render();
+    if (!same && this.isConnected) this.#render();
   }
 
   /** Open the panel (button mode) — e.g. from your own Share button. */
   open(): void {
-    const dialog = this.#root.querySelector("dialog");
+    const dialog = this.#root.querySelector<HTMLDialogElement>("dialog:not(.wx-hint)");
     if (dialog && !dialog.open) {
       dialog.showModal();
       this.#emit("sw-open", { method: "dialog" });
@@ -122,7 +130,7 @@ export class ShareWidgetElement extends Base {
 
   /** Close the panel (button mode) or hide it (panel mode). */
   close(): void {
-    const dialog = this.#root.querySelector("dialog");
+    const dialog = this.#root.querySelector<HTMLDialogElement>("dialog:not(.wx-hint)");
     if (dialog) {
       dialog.close();
       return;
@@ -188,8 +196,10 @@ export class ShareWidgetElement extends Base {
     return this.getAttribute("template") ?? undefined;
   }
 
+  /** Widget-local targets first (by id, then by the alias's canonical id), then the registry. */
   #lookup(id: string): ShareTarget | undefined {
-    return this.#targets.get(id) ?? getShareTarget(id);
+    const canonical = getShareTarget(id)?.id;
+    return this.#targets.get(id) ?? (canonical ? this.#targets.get(canonical) : undefined) ?? getShareTarget(id);
   }
 
   #context(target: ShareTarget, data: ShareData): ShareContext {
@@ -197,7 +207,8 @@ export class ShareWidgetElement extends Base {
       { ...data, url: this.#urlFor(target.id, data.url) },
       {
         template: this.#template(),
-        image: safeImage(this.getAttribute("image")) ?? "",
+        // Only absolute http(s) images are useful to share services (not data:/blob:).
+        image: httpImage(safeImage(this.getAttribute("image"))),
         env: this.#env ?? detectEnv(),
         lang: this.#rawLang(),
       },
@@ -241,24 +252,49 @@ export class ShareWidgetElement extends Base {
       data ? this.#cardBody(data, L, heading, headingId, isButton) : `<p class="empty">${esc(L.noUrl)}</p>`
     }</div>`;
 
-    const hint = `<div class="wx-hint" part="wechat-hint" role="dialog" aria-modal="true" aria-label="${esc(L.more)}" hidden>
+    // A <dialog> of its own, so it sits in the top layer — above the share dialog too.
+    const hint = `<dialog class="wx-hint" part="wechat-hint" aria-label="${esc(L.more)}">
         ${icons.arrow}
         <p class="wx-hint-text">${esc(L.wechatHint)}</p>
         <button type="button" class="pill" data-action="hint-close">${esc(L.gotIt)}</button>
-      </div>`;
+      </dialog>`;
 
+    // Keep an open share dialog open (and its status message) across re-renders.
+    const oldDialog = this.#root.querySelector<HTMLDialogElement>("dialog:not(.wx-hint)");
+    const wasOpen = !!oldDialog?.open;
+    const oldStatus = this.#root.querySelector(".status");
+    const status = oldStatus ? { text: oldStatus.textContent ?? "", visible: !oldStatus.classList.contains("sr-only") } : null;
+    const focused = (this.#root.activeElement as HTMLElement | null)?.dataset;
+    const focusKey = focused ? `${focused.action ?? ""}|${focused.target ?? ""}|${focused.method ?? ""}` : "";
+
+    this.#rerendering = true;
     this.#root.innerHTML = isButton
       ? `<style>${styles}</style>
          <button type="button" class="trigger" part="trigger" data-action="open" aria-haspopup="dialog">${icons.share}<span>${esc(L.share)}</span></button>
          <dialog part="dialog" aria-labelledby="${headingId}">${card}</dialog>${hint}`
       : `<style>${styles}</style>${card}${hint}`;
 
-    const dialog = this.#root.querySelector("dialog");
+    this.#rerendering = false;
+
+    const dialog = this.#root.querySelector<HTMLDialogElement>("dialog:not(.wx-hint)");
     if (dialog) {
       dialog.addEventListener("close", () => {
+        if (this.#rerendering) return;
         this.#root.querySelector<HTMLElement>(".trigger")?.focus();
         this.#emit("sw-close", { method: "dialog" });
       });
+      if (wasOpen && this.isConnected) dialog.showModal();
+    }
+    this.#root.querySelector("dialog.wx-hint")?.addEventListener("close", () => {
+      this.#hintOpener?.focus?.();
+      this.#hintOpener = null;
+    });
+    if (status?.text) this.#status(status.text, status.visible);
+    if (focusKey) {
+      const again = [...this.#root.querySelectorAll<HTMLElement>("[data-action]")].find(
+        (el) => `${el.dataset.action ?? ""}|${el.dataset.target ?? ""}|${el.dataset.method ?? ""}` === focusKey,
+      );
+      again?.focus({ preventScroll: true });
     }
 
     const slot = this.#root.querySelector<HTMLSlotElement>('slot[name="preview"]');
@@ -279,6 +315,8 @@ export class ShareWidgetElement extends Base {
       return `<span class="icon"${tile}>${icon}</span><span class="label">${esc(label)}</span>`;
     };
 
+    const env = this.#env ?? detectEnv();
+    this.#rendered = new Map();
     const html = items
       .map((item, i) => {
         const autofocus = i === 0 && isButton ? " autofocus" : "";
@@ -296,9 +334,16 @@ export class ShareWidgetElement extends Base {
         const label = targetLabel(target, this.#rawLang());
         const icon = target.icon ?? brandIcon(target.id) ?? monogram(MONOGRAMS[target.id] ?? label, brand);
         const part = `action action-target action-${esc(target.id)}`;
-        const isLink = !target.onSelect && !target.copy && !target.app;
+        // A plain link only when nothing has to happen before opening it.
+        const isLink =
+          !target.onSelect &&
+          !target.copy &&
+          !target.app &&
+          !target.insideApp?.(env) &&
+          !(target.desktop === "qr" && !env.mobile);
         const href = isLink ? resolveTargetHref(target, this.#context(target, data)) : null;
         if (isLink && !href) return "";
+        this.#rendered.set(target.id, target);
         if (href) {
           const newTab = target.newTab ?? /^https?:/i.test(href);
           return `<a class="action" part="${part}" data-action="target" data-target="${esc(target.id)}" href="${esc(href)}"${
@@ -310,7 +355,6 @@ export class ShareWidgetElement extends Base {
       .filter(Boolean);
 
     const count = html.length;
-    const cols = `--sw-cols:${Math.min(count, 4)};--sw-cols-wide:${Math.min(count, 6)}`;
 
     return `
       <div class="preview" part="preview" hidden>
@@ -321,7 +365,7 @@ export class ShareWidgetElement extends Base {
         <h2 class="heading" part="heading" id="${headingId}">${esc(heading)}</h2>
         ${closable ? `<button type="button" class="close" part="close" data-action="close" aria-label="${esc(L.close)}">${icons.close}</button>` : ""}
       </div>
-      ${count ? `<div class="actions${brand ? " tiles" : ""}" part="actions" style="${cols}">${html.join("")}</div>` : ""}
+      ${count ? `<div class="actions${brand ? " tiles" : ""}" part="actions">${html.join("")}</div>` : ""}
       <div class="qr" part="qr" id="${this.#id}-qr" ${this.#qrOpen ? "" : "hidden"}>
         <div class="qr-code" part="qr-code" role="img" aria-label="${esc(L.qrAlt)}"></div>
         <p class="qr-hint">${esc(L.scanHint)}</p>
@@ -407,8 +451,8 @@ export class ShareWidgetElement extends Base {
         void this.#native(data);
         break;
       case "target": {
-        const target = this.#lookup(el.dataset.target ?? "");
-        if (target) void this.#runTarget(target, data, el instanceof HTMLAnchorElement);
+        const target = this.#rendered.get(el.dataset.target ?? "");
+        if (target) void this.#runTarget(target, data, el instanceof HTMLAnchorElement, el);
         break;
       }
     }
@@ -418,7 +462,7 @@ export class ShareWidgetElement extends Base {
     const L = this.#strings();
     const method = button.dataset.method ?? "copy";
     const url = this.#urlFor("copy", data.url);
-    const ok = await copyText(url);
+    const ok = await copyText(url, this.#copyContainer());
     this.#emit("sw-copy", { method, url, ok });
 
     if (!ok) {
@@ -490,7 +534,7 @@ export class ShareWidgetElement extends Base {
 
   async #native(data: ShareData): Promise<void> {
     if (this.#env?.wechat) {
-      this.#hint(this.#strings().wechatHint);
+      this.#hint(this.#strings().wechatHint, this.#root.querySelector<HTMLElement>('[data-action="native"]'));
       this.#emit("sw-share", { method: "wechat-hint", url: data.url });
       return;
     }
@@ -505,12 +549,14 @@ export class ShareWidgetElement extends Base {
    * already navigates — we only report it. Others copy and/or open an app, or
    * run their own onSelect.
    */
-  async #runTarget(target: ShareTarget, data: ShareData, isLink: boolean): Promise<void> {
+  async #runTarget(target: ShareTarget, data: ShareData, isLink: boolean, origin?: HTMLElement): Promise<void> {
     const ctx = this.#context(target, data);
     const L = this.#strings();
     const name = targetLabel(target, this.#rawLang());
     const report = (detail: Partial<ShareWidgetEventDetail>) =>
       this.#emit("sw-share", { method: target.id, url: ctx.url, ...detail });
+    const copyNow = async (value: string) =>
+      copyTextSync(value, this.#copyContainer()) || (await copyText(value, this.#copyContainer()));
 
     if (isLink) {
       report({});
@@ -519,7 +565,7 @@ export class ShareWidgetElement extends Base {
 
     if (target.onSelect) {
       try {
-        await target.onSelect(ctx, this.#tools(data));
+        await target.onSelect(ctx, this.#tools(data, origin));
         report({ ok: true });
       } catch {
         report({ ok: false });
@@ -529,50 +575,54 @@ export class ShareWidgetElement extends Base {
 
     // 1. Already inside this app's browser (e.g. WeChat): its own ··· menu is the way to share.
     if (target.insideApp?.(ctx.env)) {
-      this.#hint(target.id === "wechat" ? L.wechatHint : fill(L.menuHint, name));
+      this.#hint(target.id === "wechat" ? L.wechatHint : fill(L.menuHint, name), origin);
       report({ result: "menu-hint" });
       return;
     }
 
     const copyValue = target.copy === "message" ? ctx.message : ctx.url;
 
-    // 2. Phone-first app on a computer: copy, and show the QR code to scan with the phone.
+    // 2. Phone-first app on a computer: copy the link, and show the QR code to scan with the phone.
     if (target.desktop === "qr" && !ctx.env.mobile) {
-      const ok = target.copy ? await copyText(copyValue) : true;
+      const ok = await copyNow(copyValue);
       this.#toggleQr(data, true);
-      this.#status(fill(ok && target.copy ? L.copiedScan : L.scanWith, name), true);
+      this.#status(fill(ok ? L.copiedScan : L.scanWith, name), true);
       report({ result: "qr", ok });
       return;
     }
 
-    const scheme = resolveAppScheme(target.app, ctx);
-    // 3. In-app browsers (WeChat, Instagram, TikTok…) block custom schemes: copy only.
-    const blocked = !!scheme && !isWebUrl(scheme) && ctx.env.inAppBrowser;
+    // Where to go after copying: the app, or the target's own link.
+    const destination = resolveAppScheme(target.app, ctx) ?? resolveTargetHref(target, ctx);
+    // 3. In-app browsers (WeChat, Instagram, Android WebViews…) block URL schemes: copy only.
+    const blocked = !!destination && !isWebUrl(destination) && ctx.env.inAppBrowser;
 
     // 4. Copy first, synchronously: opening an app or tab takes focus away from
     //    the page, and the async Clipboard API is refused once that happens.
     //    Staying synchronous also keeps us inside the tap, which browsers
     //    require for opening apps and tabs. Async copy is only the fallback.
-    if (target.copy) {
-      const copied = copyTextSync(copyValue) || (await copyText(copyValue));
+    //    Targets without `copy` still copy the link when we can't open anything,
+    //    so the user always has something to paste.
+    const mustCopy = !!target.copy || !destination || blocked;
+    if (mustCopy) {
+      const copied = await copyNow(copyValue);
       if (!copied) {
         this.#copyFailed();
         report({ ok: false });
         return;
       }
     }
-    let launching: Promise<string> = Promise.resolve("unknown");
-    if (scheme && !blocked) {
-      if (isWebUrl(scheme)) {
-        globalThis.open?.(scheme, "_blank", "noopener,noreferrer");
-      } else {
-        launching = launchApp(scheme);
-      }
-    }
-    if (!scheme || blocked) {
+    if (!destination || blocked) {
       this.#status(fill(L.copiedPaste, name), true);
       report({ result: blocked ? "blocked" : "copied", ok: true });
       return;
+    }
+
+    let launching: Promise<string> = Promise.resolve("unknown");
+    if (isWebUrl(destination)) {
+      if (target.newTab === false) globalThis.location.assign(destination);
+      else globalThis.open?.(destination, "_blank", "noopener,noreferrer");
+    } else {
+      launching = launchApp(destination);
     }
     this.#status(fill(target.copy ? L.copiedOpening : L.opening, name), true);
     const result = await launching;
@@ -580,11 +630,21 @@ export class ShareWidgetElement extends Base {
     report({ result, ok: result !== "not-opened" });
   }
 
-  #tools(data: ShareData): ShareTools {
+  /** Where the temporary copy textarea may go: inside the open dialog if there is one (outside it is inert). */
+  #copyContainer(): Node {
+    const open = this.#root.querySelector<HTMLDialogElement>("dialog[open]:not(.wx-hint)");
+    return open ?? this.#root.querySelector(".card") ?? this.#root;
+  }
+
+  #tools(data: ShareData, origin?: HTMLElement): ShareTools {
     return {
-      copy: (text) => copyText(text),
+      copy: async (text) => copyTextSync(text, this.#copyContainer()) || (await copyText(text, this.#copyContainer())),
       open: (url, newTab) => {
         if (!isAllowedHref(url)) return;
+        if (!isWebUrl(url) && !newTab) {
+          void launchApp(url);
+          return;
+        }
         const tab = newTab ?? /^https?:/i.test(url);
         if (tab) globalThis.open?.(url, "_blank", "noopener,noreferrer");
         else globalThis.location.href = url;
@@ -592,18 +652,23 @@ export class ShareWidgetElement extends Base {
       launchApp: (scheme) => (isAllowedHref(scheme) ? launchApp(scheme) : Promise.resolve("not-opened")),
       status: (message, visible = true) => this.#status(message, visible),
       openQr: () => this.#toggleQr(data, true),
-      pointToMenu: (message) => this.#hint(message),
+      pointToMenu: (message) => this.#hint(message, origin),
     };
   }
 
   /** Show the full-screen "tap ··· top-right" hint with a message, or hide it (null). */
-  #hint(message: string | null): void {
-    const hint = this.#root.querySelector<HTMLElement>(".wx-hint");
+  #hint(message: string | null, opener?: HTMLElement | null): void {
+    const hint = this.#root.querySelector<HTMLDialogElement>("dialog.wx-hint");
     if (!hint) return;
+    if (message === null) {
+      if (hint.open) hint.close();
+      return;
+    }
     const text = hint.querySelector(".wx-hint-text");
-    if (message !== null && text) text.textContent = message;
-    hint.hidden = message === null;
-    if (message !== null) hint.querySelector<HTMLElement>("button")?.focus();
+    if (text) text.textContent = message;
+    this.#hintOpener = opener ?? (this.#root.activeElement as HTMLElement | null);
+    if (!hint.open) hint.showModal();
+    hint.querySelector<HTMLElement>("button")?.focus();
   }
 
   /** Announce a message; `visible` also shows it under the panel (used for errors and app hand-offs). */
@@ -661,6 +726,10 @@ function safeImage(src: string | null): string | null {
   } catch {
     return null;
   }
+}
+
+function httpImage(src: string | null): string {
+  return src && /^https?:\/\//i.test(src) ? src : "";
 }
 
 function slug(value: string | undefined): string {

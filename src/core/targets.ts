@@ -233,8 +233,29 @@ export function fillTemplate(template: string, ctx: ShareContext): string {
 /** The URL a target opens for this context, or null if it has none. */
 export function resolveTargetHref(target: ShareTarget, ctx: ShareContext): string | null {
   if (!target.href) return null;
-  const href = typeof target.href === "string" ? fillTemplate(target.href, ctx) : target.href(ctx);
-  return href && isAllowedHref(href) ? href : null;
+  let href: string | null;
+  try {
+    href = typeof target.href === "string" ? fillTemplate(target.href, ctx) : target.href(ctx);
+  } catch {
+    return null; // one broken target must not break the widget
+  }
+  return safeHref(href);
+}
+
+/** Make a URL absolute (relative ones against the page) and refuse dangerous schemes. */
+export function safeHref(href: string | null | undefined): string | null {
+  if (!href) return null;
+  const trimmed = href.trim();
+  if (isAllowedHref(trimmed)) return trimmed;
+  if (/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) return null; // a scheme we refuse
+  const base = (globalThis.document as Document | undefined)?.baseURI;
+  if (!base) return null;
+  try {
+    const absolute = new URL(trimmed, base).href;
+    return isAllowedHref(absolute) ? absolute : null;
+  } catch {
+    return null;
+  }
 }
 
 /** The app URL to open on this platform (placeholders filled), if any. */
@@ -242,15 +263,19 @@ export function resolveAppScheme(app: AppScheme | undefined, ctx: ShareContext):
   if (!app) return null;
   const { env } = ctx;
   let scheme: string | null | undefined;
-  if (typeof app === "function") scheme = app(ctx);
-  else {
-    const pick =
-      typeof app === "string"
-        ? app
-        : ((env.ios ? app.ios : env.android ? app.android : env.mobile ? undefined : app.desktop) ?? app.default);
-    scheme = pick ? fillTemplate(pick, ctx) : null;
+  try {
+    if (typeof app === "function") scheme = app(ctx);
+    else {
+      const pick =
+        typeof app === "string"
+          ? app
+          : ((env.ios ? app.ios : env.android ? app.android : env.mobile ? undefined : app.desktop) ?? app.default);
+      scheme = pick ? fillTemplate(pick, ctx) : null;
+    }
+  } catch {
+    return null;
   }
-  return scheme && isAllowedHref(scheme) ? scheme : null;
+  return safeHref(scheme);
 }
 
 /** Whether the target should be shown in this environment. */

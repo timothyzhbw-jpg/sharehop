@@ -28,7 +28,8 @@ export interface ShareWidgetProps {
   brandColors?: boolean;
   /** "panel" renders inline (default); "button" renders a Share button that opens the panel. */
   mode?: "panel" | "button";
-  lang?: "en" | "zh";
+  /** "en" or "zh" for the widget's text; other codes ("ko", "ja", "ru") pick app names where they differ. */
+  lang?: "en" | "zh" | (string & {});
   theme?: "light" | "dark" | "auto";
   /** Append utm_source=<channel>&utm_medium=share to shared links. */
   utm?: boolean;
@@ -85,7 +86,14 @@ export function ShareWidget(props: ShareWidgetProps) {
     });
   }, [labelsKey]);
 
-  const targets = props.targets;
+  // Inline arrays get a new identity on every render; only pass them on when
+  // their items actually changed (the element also ignores identical lists).
+  const targetsRef = useRef<ShareTarget[] | undefined>(undefined);
+  const prev = targetsRef.current;
+  const next = props.targets;
+  const targets =
+    prev && next && prev.length === next.length && prev.every((t, i) => t === next[i]) ? prev : next;
+  targetsRef.current = targets;
   useEffect(() => {
     const el = ref.current;
     if (!el) return;

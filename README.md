@@ -42,7 +42,7 @@ The demo uses made-up listings and links only.
 </share-widget>
 ```
 
-Leave out `url` to share the current page. `share-widget.global.js` is ~34 KB gzipped with all brand logos; `share-widget.lite.global.js` (~18 KB) shows letter icons instead.
+Leave out `url` to share the current page. `share-widget.global.js` is ~35 KB gzipped with all brand logos; `share-widget.lite.global.js` (~19 KB) shows letter icons instead.
 
 ### npm + bundler
 
@@ -75,6 +75,8 @@ import { ShareWidget } from "share-panel-widget/react";
 
 ## Apps
 
+![Two share panels with brand-coloured app tiles: one for international friends (WhatsApp, Instagram, WeChat, LINE, Telegram, X), one in Chinese (WeChat, QQ, Weibo, Qzone, Douban)](docs/apps.png)
+
 List app ids in `actions`, in the order you want them, mixed freely with `copy`, `qr` and `native` (the "More" button):
 
 ```html
@@ -86,7 +88,7 @@ List app ids in `actions`, in the order you want them, mixed freely with `copy`,
 | Opens with the message filled in | `whatsapp`, `telegram`, `line`, `sms`, `email`, `snapchat`, `x`, `facebook`, `linkedin`, `reddit`, `threads`, `bluesky`, `pinterest`, `tumblr`, `mastodon`, `hackernews`, `vk`, `naver`, `band`, `hatena`, `nextdoor`, `flipboard`, `weibo`, `qzone`, `douban`, `googleclassroom`, `teams`, `gmail`, `outlook` |
 | Copies the message, then opens the app | `wechat`, `qq`, `instagram`, `tiktok`, `discord`, `slack`, `kakaotalk`, `groupme`, `messenger`, `viber`, `xiaohongshu`, `douyin`, `zhihu`, `dingtalk` |
 
-Aliases: `twitter` → `x`, `weixin` → `wechat`, `xhs` / `rednote` → `xiaohongshu`, `mail` → `email`, `text` → `sms`.
+Aliases: `twitter` → `x`, `weixin` → `wechat`, `xhs` / `rednote` → `xiaohongshu` (shown as "rednote" in English), `mail` → `email`, `text` → `sms`.
 
 Some only appear where they can work: `sms`, `messenger`, `viber`, `kakaotalk`, `groupme`, `xiaohongshu`, `douyin`, `zhihu` on phones; `gmail`, `outlook`, `teams` on computers; `pinterest` only when the widget has an `image`.
 
@@ -113,7 +115,7 @@ Services blocked in mainland China (X, Facebook, WhatsApp, Telegram, LINE, Googl
 
 1. Inside that app's own browser (e.g. the WeChat button inside WeChat): a hint points to the app's ··· menu.
 2. On a computer, for phone-first apps (WeChat, QQ): the link is copied and the QR code opens, to scan with the phone.
-3. Inside other in-app browsers, which block app links: the message is copied and the user is told to paste it in the app.
+3. Inside other in-app browsers (Instagram, TikTok, Android WebViews…), which block app links: the message is copied and the user is told to paste it in the app.
 4. Otherwise the message is copied (synchronously, inside the tap, so it survives the app switch) and the app is opened — through its https universal link where it has one, or its URL scheme (an `intent://` URL on Android, which falls back to the Play Store). If nothing opens within ~1.6 s, the widget says so and reminds the user the link is copied.
 
 ## Plug in your own app
@@ -189,7 +191,8 @@ registerShareTarget({
 - `registerShareTarget()` returns a function that removes exactly that registration again.
 - Registering an existing id (e.g. `"telegram"`) overrides the built-in. That's also how you fix one if a service changes its link before this package updates.
 - `unregisterShareTarget(id)` removes a target entirely; `listShareTargets()` and `getShareTarget(id)` read the registry.
-- For one widget only, set `el.targets = [ … ]` (React: `targets={[…]}`); those win over registered targets with the same id.
+- For one widget only, set `el.targets = [ … ]` (React: `targets={[…]}`); those win over registered targets with the same id. Setting the same targets again does nothing, so an inline array in React is fine.
+- `icon` is inserted as markup: pass your own SVG, never text that came from users.
 - Target links are never allowed to use `javascript:`, `data:` or similar schemes.
 
 Without the widget, `shareTargetUrl("telegram", { url, title, text })` returns the share URL for any target.
@@ -210,7 +213,7 @@ Without the widget, `shareTargetUrl("telegram", { url, title, text })` returns t
 | `theme` | `theme` | `auto` | `light`, `dark` or `auto` (follows the system). |
 | `utm` | `utm` | off | Adds `utm_source=<channel>&utm_medium=share` to shared links (`copy`, `qr`, `native` or the app id). The visible link stays clean. |
 | `closable` | `closable` | off | Shows a × in panel mode. Clicking it hides the widget unless `sw-close` is cancelled. |
-| `image`, `preview-title`, `preview-subtitle`, `preview-meta` | `image`, `previewTitle`, … | — | Optional preview card above the panel (image, title, a bold line such as a price, a muted line). `image` is also sent to Pinterest, Weibo, Qzone and others. |
+| `image`, `preview-title`, `preview-subtitle`, `preview-meta` | `image`, `previewTitle`, … | — | Optional preview card above the panel (image, title, a bold line such as a price, a muted line). `image` (if it is an absolute http(s) URL) is also sent to Pinterest, Weibo, Qzone and others. |
 
 For a fully custom preview, put your own markup in the `preview` slot (in React: pass `children`):
 
@@ -252,7 +255,7 @@ share-widget {
 
 For deeper changes, style the exposed parts: `share-widget::part(card)`, `heading`, `actions`, `action`, `action-copy`, `action-qr`, `action-native`, `action-target`, `action-<app id>` (e.g. `action-wechat`), `qr`, `qr-code`, `download`, `url-row`, `url`, `copy-button`, `status`, `trigger`, `dialog`, `close`, `preview`, `preview-image`, `preview-title`, `preview-subtitle`, `preview-meta`, `divider`, `wechat-hint`.
 
-Up to 4 buttons fit per row on narrow widgets and up to 6 on wide ones (the card uses a container query); more wrap onto further rows.
+Buttons are laid out in as many columns as fit (about 4 on a phone, more on a wide card); extra ones wrap onto further rows.
 
 To avoid a flash before the script loads, you can reserve space: `share-widget:not(:defined) { display: block; min-height: 180px; }`.
 
@@ -286,7 +289,7 @@ document.addEventListener("sw-share", (e) => analytics.track("share", e.detail))
 
 ## Browser support
 
-Current Chrome, Edge, Firefox and Safari (15.4+ for `<dialog>`, 16+ for the container-query layout). The native share sheet is available on phones (iOS Safari, Android Chrome) and in some desktop browsers; where a browser has none, "More" is hidden and Copy link / QR code remain.
+Current Chrome, Edge, Firefox and Safari (15.4+, for `<dialog>`). The native share sheet is available on phones (iOS Safari, Android Chrome) and in some desktop browsers; where a browser has none, "More" is hidden and Copy link / QR code remain.
 
 Opening apps can't be fully tested without the real devices and apps: detection that an app did *not* open is a best guess (the page didn't lose focus within ~1.6 s), and iOS Safari shows its own "Open in …?" prompt or an "address is invalid" alert for URL schemes.
 

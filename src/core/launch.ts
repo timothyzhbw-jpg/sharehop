@@ -1,3 +1,5 @@
+import { isAllowedHref } from "./targets.ts";
+
 export type LaunchResult = "opened" | "not-opened" | "unknown";
 
 /**
@@ -13,6 +15,7 @@ export function launchApp(scheme: string, options: { timeout?: number } = {}): P
   const doc = globalThis.document as Document | undefined;
   const win = globalThis.window as (Window & typeof globalThis) | undefined;
   if (!doc || !win) return Promise.resolve("unknown");
+  if (!isAllowedHref(scheme)) return Promise.resolve("not-opened");
   const timeout = options.timeout ?? 1600;
 
   return new Promise((resolve) => {

@@ -30,8 +30,10 @@ function intent(scheme: string, pkg: string, path = ""): string {
   return `intent://${path}#Intent;scheme=${scheme};package=${pkg};end`;
 }
 
+/** Shorten to `max` characters (code points, so emoji are never cut in half). */
 function clip(value: string, max: number): string {
-  return value.length > max ? `${value.slice(0, max - 1).trimEnd()}…` : value;
+  const chars = Array.from(value);
+  return chars.length > max ? `${chars.slice(0, max - 1).join("").trimEnd()}…` : value;
 }
 
 const brandless = (ctx: ShareContext) => ctx.summary || ctx.title;
@@ -100,7 +102,7 @@ export const BUILTIN_TARGETS: readonly ShareTarget[] = [
     copy: "link",
     // Documented viber://forward; Viber keeps only the first 200 characters, so the link goes last.
     app: (ctx) => {
-      const room = 200 - ctx.url.length - 1;
+      const room = 200 - Array.from(ctx.url).length - 1;
       const text = room > 10 && ctx.summary ? `${clip(ctx.summary, room)} ${ctx.url}` : ctx.url;
       return `viber://forward?text=${encodeURIComponent(text)}`;
     },
@@ -112,7 +114,9 @@ export const BUILTIN_TARGETS: readonly ShareTarget[] = [
     platforms: "mobile",
     // Pre-filled sharing needs the Kakao JS SDK and an app key; without one, copy and open.
     copy: "message",
-    app: { ios: "kakaotalk://", android: intent("kakaotalk", "com.kakao.talk") },
+    // kakaotalk://launch is from the Android app's URL table (undocumented); iOS
+    // accepts the bare scheme.
+    app: { ios: "kakaotalk://", android: intent("kakaotalk", "com.kakao.talk", "launch") },
   },
   {
     id: "groupme",
@@ -342,7 +346,7 @@ export const BUILTIN_TARGETS: readonly ShareTarget[] = [
   },
   {
     id: "xiaohongshu",
-    label: { en: "RED", zh: "小红书" },
+    label: { en: "rednote", zh: "小红书" },
     color: "#FF2442",
     platforms: "mobile",
     copy: "message",

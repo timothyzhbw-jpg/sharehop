@@ -11,7 +11,10 @@ export interface ShareEnvironment {
   android: boolean;
 }
 
-const IN_APP = /FBAN|FBAV|FB_IAB|Instagram|Line\/|Twitter|LinkedInApp|Snapchat|TikTok|musical_ly|BytedanceWebview|Weibo|QQ\/|DingTalk/i;
+// In-app browsers: social apps, plus Android WebViews ("; wv)") in general,
+// which can't open other apps by URL scheme.
+const IN_APP =
+  /FBAN|FBAV|FB_IAB|Instagram|Line\/|Twitter|LinkedInApp|Snapchat|TikTok|musical_ly|BytedanceWebview|Weibo|QQ\/|DingTalk|KAKAOTALK|NAVER\(inapp|AlipayClient|baiduboxapp|; wv\)/i;
 
 /** Detect the browser environment from a user agent string (defaults to navigator.userAgent). */
 export function detectEnv(userAgent?: string): ShareEnvironment {
