@@ -1,0 +1,74 @@
+{
+  "name": "share-panel-widget",
+  "version": "0.1.0",
+  "description": "A small, framework-free share panel for any website: copy link, QR code with PNG download, native share sheet, WhatsApp and email — as a Web Component with a thin React wrapper.",
+  "license": "MIT",
+  "author": "Bowen Zhang",
+  "type": "module",
+  "keywords": [
+    "share",
+    "share-button",
+    "web-share-api",
+    "qr-code",
+    "copy-link",
+    "web-component",
+    "custom-element",
+    "react"
+  ],
+  "sideEffects": [
+    "./dist/element/define.js",
+    "./dist/share-widget.global.js"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/core/index.d.ts",
+      "default": "./dist/core/index.js"
+    },
+    "./element": {
+      "types": "./dist/element/index.d.ts",
+      "default": "./dist/element/index.js"
+    },
+    "./define": {
+      "types": "./dist/element/define.d.ts",
+      "default": "./dist/element/define.js"
+    },
+    "./react": {
+      "types": "./dist/react/index.d.ts",
+      "default": "./dist/react/index.js"
+    },
+    "./global": "./dist/share-widget.global.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "build": "node scripts/clean.mjs && tsc -p tsconfig.build.json && node scripts/bundle.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test test/*.test.ts",
+    "demo": "node scripts/serve.mjs"
+  },
+  "dependencies": {
+    "uqr": "^0.1.3"
+  },
+  "peerDependencies": {
+    "react": ">=18"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^24",
+    "@types/react": "^19",
+    "esbuild": "^0.28.2",
+    "jsqr": "^1.4.0",
+    "typescript": "~5.9.3"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

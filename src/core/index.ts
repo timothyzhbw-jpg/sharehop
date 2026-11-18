@@ -1,0 +1,11 @@
+export type { ShareData } from "./text.ts";
+export { composeShareText, composeShareTextWithoutUrl, withShareSource, resolveShareUrl } from "./text.ts";
+export { copyText } from "./clipboard.ts";
+export type { NativeShareResult } from "./native.ts";
+export { canNativeShare, nativeShare } from "./native.ts";
+export type { ShareTargetId } from "./targets.ts";
+export { SHARE_TARGETS, shareTargetUrl } from "./targets.ts";
+export type { ShareEnvironment } from "./env.ts";
+export { detectEnv } from "./env.ts";
+export type { QrErrorCorrection, QrOptions } from "./qr.ts";
+export { qrMatrix, qrSvg, qrPngBlob } from "./qr.ts";

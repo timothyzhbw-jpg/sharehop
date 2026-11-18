@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>share-widget demo</title>
+  <meta name="color-scheme" content="light dark">
+  <style>
+    :root { color-scheme: light dark; --page: #f6f6f4; --ink: #151515; --soft: #66645f; --line: #e3e1dc; }
+    @media (prefers-color-scheme: dark) { :root { --page: #111111; --ink: #f0f0f0; --soft: #a3a3a3; --line: #2a2a2a; } }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--page); color: var(--ink); font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, "PingFang SC", sans-serif; }
+    main { max-width: 760px; margin: 0 auto; padding: 32px 16px 80px; }
+    h1 { font-size: 28px; margin: 0 0 4px; }
+    h2 { font-size: 18px; margin: 48px 0 6px; }
+    p.lead, p.note { color: var(--soft); margin: 0 0 16px; }
+    code { font: 14px ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border: 1px solid var(--line); border-radius: 16px; }
+    .topbar strong { font-size: 17px; }
+    .slot-preview { display: flex; gap: 14px; align-items: center; }
+    .slot-preview .badge { display: grid; place-items: center; width: 64px; height: 64px; border-radius: 16px; background: #14532d; color: #fff; font-weight: 700; font-size: 22px; flex: none; }
+    .slot-preview p { margin: 0; }
+    .slot-preview small { color: #6b6b6b; }
+    #log { font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; background: color-mix(in srgb, var(--ink) 6%, transparent); border-radius: 12px; padding: 12px; min-height: 64px; white-space: pre-wrap; word-break: break-all; margin: 0; }
+    .brand { --sw-accent: #b45309; --sw-radius: 14px; --sw-font: Georgia, "Songti SC", serif; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>share-widget</h1>
+  <p class="lead">Copy link, QR code, native share and WhatsApp in one small panel. Every listing, club and address on this page is made up.</p>
+
+  <h2>1 · Inline panel with a preview</h2>
+  <p class="note">The layout from the design brief: preview, four actions, then the link with a Copy button.</p>
+  <share-widget
+    id="listing"
+    url="https://example.com/marketplace/27-inch-monitor"
+    share-title="27-inch Monitor"
+    share-text="$85 · pickup in New Brunswick"
+    heading="Share this listing"
+    image="./monitor.svg"
+    preview-title="27-inch Monitor"
+    preview-subtitle="$85"
+    preview-meta="Campus Marketplace · New Brunswick, NJ"
+    closable>
+  </share-widget>
+
+  <h2>2 · Button that opens the panel</h2>
+  <p class="note">For a page header: <code>mode="button"</code>. On phones the panel slides up as a bottom sheet.</p>
+  <div class="topbar">
+    <strong>Sunny 2-bed sublet, spring term</strong>
+    <share-widget
+      mode="button"
+      url="https://example.com/housing/sunny-2-bed"
+      share-title="Sunny 2-bed sublet"
+      share-text="$1,150/mo · 8 min walk to campus"
+      heading="Share this place"
+      actions="copy,qr,whatsapp,email,native">
+    </share-widget>
+  </div>
+
+  <h2>3 · 中文、自定义文案、品牌色和来源标记</h2>
+  <p class="note"><code>lang="zh"</code>，<code>template</code> 自定义分享文案，<code>utm</code> 给每个渠道的链接加 <code>utm_source</code>，CSS 变量换颜色和字体；预览区用 slot 自己写。</p>
+  <share-widget
+    class="brand"
+    lang="zh"
+    url="https://example.com/clubs/chess-club"
+    share-title="国际象棋社"
+    share-text="每周三晚 7 点，新手欢迎"
+    template="来看看 {title}！{text}&#10;👉 {url}"
+    heading="分享社团主页"
+    utm>
+    <div slot="preview" class="slot-preview">
+      <span class="badge">♞</span>
+      <div><p><strong>国际象棋社</strong></p><small>学生社团 · 128 位成员</small></div>
+    </div>
+  </share-widget>
+
+  <h2>4 · Dark theme, two actions</h2>
+  <share-widget
+    theme="dark"
+    url="https://example.com/store/jamie"
+    share-title="Jamie's store"
+    share-text="15 items for sale"
+    heading="Share my store"
+    actions="copy,qr">
+  </share-widget>
+
+  <h2>Events</h2>
+  <p class="note">Every widget fires <code>sw-copy</code>, <code>sw-qr</code>, <code>sw-share</code>, <code>sw-download</code>, <code>sw-open</code> and <code>sw-close</code> — hook them into your own analytics.</p>
+  <pre id="log" aria-live="off">(click something above)</pre>
+</main>
+
+<script src="../dist/share-widget.global.js"></script>
+<script>
+  const log = document.getElementById("log");
+  const lines = [];
+  for (const type of ["sw-copy", "sw-qr", "sw-share", "sw-download", "sw-open", "sw-close"]) {
+    document.addEventListener(type, (event) => {
+      const where = event.target.getAttribute("share-title") || event.target.id;
+      lines.unshift(`${type}  [${where}]  ${JSON.stringify(event.detail)}`);
+      log.textContent = lines.slice(0, 8).join("\n");
+    });
+  }
+</script>
+</body>
+</html>
