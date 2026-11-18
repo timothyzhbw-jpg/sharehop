@@ -14,10 +14,16 @@ export async function copyText(text: string): Promise<boolean> {
       // fall through to the legacy path
     }
   }
-  return legacyCopy(text);
+  return copyTextSync(text);
 }
 
-function legacyCopy(text: string): boolean {
+/**
+ * Copy synchronously (textarea + execCommand). Use it when the page is about
+ * to lose focus right away — e.g. just before opening an app or a new tab —
+ * because the async Clipboard API is rejected once the document loses focus.
+ * Must run inside the click handler. Returns true on success.
+ */
+export function copyTextSync(text: string): boolean {
   const doc = globalThis.document as Document | undefined;
   if (!doc?.body || typeof doc.execCommand !== "function") return false;
 

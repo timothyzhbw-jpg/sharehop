@@ -20,3 +20,19 @@ export const icons = {
   share: svg('<path d="M12 3.5v12M7.5 8L12 3.5 16.5 8M5 13.5v5A2 2 0 0 0 7 20.5h10a2 2 0 0 0 2-2v-5"/>'),
   arrow: `<svg viewBox="0 0 80 80" width="80" height="80" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M10 74C18 40 40 20 70 10M52 8l18 2-6 17"/></svg>`,
 } as const;
+
+/**
+ * Fallback icon: one or two letters in a rounded square, for targets without
+ * an icon (custom targets, or brands we don't ship a logo for). `bare` draws
+ * only the letters, for use on a coloured tile.
+ */
+export function monogram(text: string, bare = false): string {
+  const chars = [...text.trim()];
+  const letters = (chars.length <= 2 ? chars : chars.slice(0, 1)).join("") || "?";
+  const safe = letters.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+  const size = [...letters].length > 1 ? 10 : 12.5;
+  const font = `font-size="${size}" font-weight="700" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif"`;
+  return bare
+    ? `<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false"><text x="12" y="12" dy=".36em" text-anchor="middle" ${font} font-size="${size + 3}" fill="currentColor">${safe}</text></svg>`
+    : `<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false"><rect x="2.5" y="2.5" width="19" height="19" rx="5.5" fill="currentColor"/><text x="12" y="12" dy=".36em" text-anchor="middle" ${font} fill="var(--_bg, #fff)">${safe}</text></svg>`;
+}

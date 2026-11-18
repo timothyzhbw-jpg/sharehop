@@ -5,6 +5,10 @@ export interface ShareEnvironment {
   inAppBrowser: boolean;
   /** Phone or tablet user agent. iPadOS in desktop mode reports as desktop. */
   mobile: boolean;
+  /** iPhone / iPad / iPod. */
+  ios: boolean;
+  /** Android (including HarmonyOS phones that report Android). */
+  android: boolean;
 }
 
 const IN_APP = /FBAN|FBAV|FB_IAB|Instagram|Line\/|Twitter|LinkedInApp|Snapchat|TikTok|musical_ly|BytedanceWebview|Weibo|QQ\/|DingTalk/i;
@@ -17,5 +21,7 @@ export function detectEnv(userAgent?: string): ShareEnvironment {
     wechat,
     inAppBrowser: wechat || IN_APP.test(ua),
     mobile: /Android|iPhone|iPad|iPod|Mobile|HarmonyOS/i.test(ua),
+    ios: /iPhone|iPad|iPod/i.test(ua),
+    android: /Android/i.test(ua),
   };
 }

@@ -8,6 +8,7 @@ const light = `
   --_on-accent: var(--sw-on-accent, #ffffff);
   --_focus: var(--sw-focus, #2563eb);
   --_success: var(--sw-success, #15803d);
+  --_tile: rgba(0, 0, 0, 0.06);
 `;
 
 const dark = `
@@ -20,6 +21,7 @@ const dark = `
   --_on-accent: var(--sw-on-accent, #111111);
   --_focus: var(--sw-focus, #60a5fa);
   --_success: var(--sw-success, #4ade80);
+  --_tile: rgba(255, 255, 255, 0.1);
 `;
 
 export const styles: string = `
@@ -71,11 +73,15 @@ svg { display: block; flex: none; }
 }
 .close:hover { background: var(--_hover); }
 
+.card { container-type: inline-size; }
 .actions {
   display: grid;
-  grid-template-columns: repeat(var(--sw-columns, 4), minmax(0, 1fr));
+  grid-template-columns: repeat(var(--sw-cols, 4), minmax(0, 1fr));
   gap: 4px;
   margin: 16px -8px 8px;
+}
+@container (min-width: 600px) {
+  .actions { grid-template-columns: repeat(var(--sw-cols-wide, 6), minmax(0, 1fr)); }
 }
 .action {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
@@ -85,6 +91,13 @@ svg { display: block; flex: none; }
 .action:hover { background: var(--_hover); }
 .action[aria-expanded="true"] { background: var(--_hover); }
 .action .icon svg { width: 28px; height: 28px; }
+.tiles .action { gap: 8px; }
+.tiles .icon {
+  display: grid; place-items: center; width: 48px; height: 48px; border-radius: 14px;
+  background: var(--sw-tile, var(--_tile)); color: var(--sw-on-tile, var(--_fg));
+}
+.tiles .icon svg { width: 26px; height: 26px; }
+.tiles .action.is-done .icon { color: var(--_success); }
 .action .label { font-size: 14px; line-height: 1.2; }
 .action.is-done, .pill.is-done { color: var(--_success); }
 

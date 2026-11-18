@@ -3,8 +3,9 @@
 import { createElement, useEffect, useRef, type CSSProperties, type ReactNode } from "react";
 import type { ShareAction, ShareWidgetEventDetail } from "../element/share-widget.ts";
 import type { ShareWidgetLabels } from "../element/labels.ts";
+import type { ShareTarget } from "../core/targets.ts";
 
-export type { ShareAction, ShareWidgetEventDetail, ShareWidgetLabels };
+export type { ShareAction, ShareWidgetEventDetail, ShareWidgetLabels, ShareTarget };
 
 export type ShareWidgetEvent = CustomEvent<ShareWidgetEventDetail>;
 
@@ -19,8 +20,12 @@ export interface ShareWidgetProps {
   template?: string;
   /** Panel heading, e.g. "Share this listing". */
   heading?: string;
-  /** Which buttons to show, in order. Default: copy, qr, whatsapp, native. */
+  /** Which buttons to show, in order: "copy", "qr", "native" and any share-target id. Default: copy, qr, whatsapp, native. */
   actions?: ShareAction[];
+  /** Extra share targets for this widget only (list their ids in `actions`). */
+  targets?: ShareTarget[];
+  /** Colour app icons in their brand colours. */
+  brandColors?: boolean;
   /** "panel" renders inline (default); "button" renders a Share button that opens the panel. */
   mode?: "panel" | "button";
   lang?: "en" | "zh";
@@ -62,7 +67,7 @@ const EVENTS = {
  * client only, so this is safe in Next.js server components' children and SSR.
  */
 export function ShareWidget(props: ShareWidgetProps) {
-  const ref = useRef<HTMLElement & { labels?: Partial<ShareWidgetLabels> }>(null);
+  const ref = useRef<HTMLElement & { labels?: Partial<ShareWidgetLabels>; targets?: ShareTarget[] }>(null);
   const handlers = useRef(props);
   handlers.current = props;
 
@@ -79,6 +84,15 @@ export function ShareWidget(props: ShareWidgetProps) {
       el.labels = props.labels ?? {};
     });
   }, [labelsKey]);
+
+  const targets = props.targets;
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    void customElements.whenDefined("share-widget").then(() => {
+      el.targets = targets ?? [];
+    });
+  }, [targets]);
 
   useEffect(() => {
     const el = ref.current;
@@ -112,6 +126,7 @@ export function ShareWidget(props: ShareWidgetProps) {
       theme: props.theme,
       utm: flag(props.utm),
       closable: flag(props.closable),
+      "brand-colors": flag(props.brandColors),
       image: props.image,
       "preview-title": props.previewTitle,
       "preview-subtitle": props.previewSubtitle,

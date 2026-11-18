@@ -1,7 +1,7 @@
 {
   "name": "share-panel-widget",
-  "version": "0.1.0",
-  "description": "A small, framework-free share panel for any website: copy link, QR code with PNG download, native share sheet, WhatsApp and email — as a Web Component with a thin React wrapper.",
+  "version": "0.2.0",
+  "description": "A small, framework-free share panel for any website: copy link, QR code, native share and 40+ apps (WhatsApp, WeChat, X, LINE, Weibo…) with a plug-in API for your own — as a Web Component with a thin React wrapper.",
   "license": "MIT",
   "author": "Bowen Zhang",
   "type": "module",
@@ -17,7 +17,8 @@
   ],
   "sideEffects": [
     "./dist/element/define.js",
-    "./dist/share-widget.global.js"
+    "./dist/share-widget.global.js",
+    "./dist/share-widget.lite.global.js"
   ],
   "exports": {
     ".": {
@@ -36,7 +37,8 @@
       "types": "./dist/react/index.d.ts",
       "default": "./dist/react/index.js"
     },
-    "./global": "./dist/share-widget.global.js"
+    "./global": "./dist/share-widget.global.js",
+    "./lite": "./dist/share-widget.lite.global.js"
   },
   "files": [
     "dist",
@@ -48,7 +50,9 @@
     "build": "node scripts/clean.mjs && tsc -p tsconfig.build.json && node scripts/bundle.mjs",
     "typecheck": "tsc --noEmit",
     "test": "node --test test/*.test.ts",
-    "demo": "node scripts/serve.mjs"
+    "demo": "node scripts/serve.mjs",
+    "check-targets": "node scripts/check-targets.mjs",
+    "icons": "node scripts/gen-brand-icons.mjs"
   },
   "dependencies": {
     "uqr": "^0.1.3"
@@ -66,6 +70,7 @@
     "@types/react": "^19",
     "esbuild": "^0.28.2",
     "jsqr": "^1.4.0",
+    "simple-icons": "^16.38.0",
     "typescript": "~5.9.3"
   },
   "engines": {

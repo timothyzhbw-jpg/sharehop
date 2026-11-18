@@ -19,7 +19,14 @@ export default function Page() {
       />
       <p style={{ marginTop: 32 }}>
         Button mode in a header:{" "}
-        <ShareWidget mode="button" url="https://example.com/clubs/chess-club" shareTitle="Chess Club" lang="zh" />
+        <ShareWidget
+          mode="button"
+          url="https://example.com/clubs/chess-club"
+          shareTitle="Chess Club"
+          lang="zh"
+          actions={["copy", "qr", "@china"]}
+          brandColors
+        />
       </p>
       <h2>Client component with event handlers</h2>
       <CopyCounter />

@@ -99,13 +99,13 @@ describe("resolveShareUrl", () => {
 
 describe("shareTargetUrl", () => {
   test("WhatsApp gets the whole message, URL-encoded", () => {
-    const url = shareTargetUrl("whatsapp", listing);
+    const url = shareTargetUrl("whatsapp", listing) ?? "";
     assert.ok(url.startsWith("https://wa.me/?text="));
     assert.equal(decodeURIComponent(url.slice("https://wa.me/?text=".length)), composeShareText(listing));
   });
 
   test("email uses title as subject and message as body", () => {
-    const url = new URL(shareTargetUrl("email", { ...listing, title: "Monitor & stand?" }));
+    const url = new URL(shareTargetUrl("email", { ...listing, title: "Monitor & stand?" }) ?? "");
     assert.equal(url.protocol, "mailto:");
     const params = new URLSearchParams(url.search);
     assert.equal(params.get("subject"), "Monitor & stand?");
@@ -113,7 +113,11 @@ describe("shareTargetUrl", () => {
   });
 
   test("email without title has no subject", () => {
-    assert.ok(!shareTargetUrl("email", { url: "https://example.com" }).includes("subject="));
+    assert.ok(!(shareTargetUrl("email", { url: "https://example.com" }) ?? "").includes("subject="));
+  });
+
+  test("unknown targets give null", () => {
+    assert.equal(shareTargetUrl("nope", listing), null);
   });
 });
 
@@ -132,17 +136,17 @@ describe("detectEnv", () => {
   };
 
   test("WeChat on iOS and Android", () => {
-    assert.deepEqual(detectEnv(ua.wechatIos), { wechat: true, inAppBrowser: true, mobile: true });
-    assert.deepEqual(detectEnv(ua.wechatAndroid), { wechat: true, inAppBrowser: true, mobile: true });
+    assert.deepEqual(detectEnv(ua.wechatIos), { wechat: true, inAppBrowser: true, mobile: true, ios: true, android: false });
+    assert.deepEqual(detectEnv(ua.wechatAndroid), { wechat: true, inAppBrowser: true, mobile: true, ios: false, android: true });
   });
 
   test("Instagram is an in-app browser but not WeChat", () => {
-    assert.deepEqual(detectEnv(ua.instagram), { wechat: false, inAppBrowser: true, mobile: true });
+    assert.deepEqual(detectEnv(ua.instagram), { wechat: false, inAppBrowser: true, mobile: true, ios: true, android: false });
   });
 
   test("plain mobile Safari and desktop Chrome", () => {
-    assert.deepEqual(detectEnv(ua.safariIos), { wechat: false, inAppBrowser: false, mobile: true });
-    assert.deepEqual(detectEnv(ua.chromeMac), { wechat: false, inAppBrowser: false, mobile: false });
+    assert.deepEqual(detectEnv(ua.safariIos), { wechat: false, inAppBrowser: false, mobile: true, ios: true, android: false });
+    assert.deepEqual(detectEnv(ua.chromeMac), { wechat: false, inAppBrowser: false, mobile: false, ios: false, android: false });
   });
 });
 

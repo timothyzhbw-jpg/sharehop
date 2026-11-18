@@ -1,25 +1,49 @@
 import { resolveShareUrl, withShareSource, type ShareData } from "../core/text.ts";
-import { copyText } from "../core/clipboard.ts";
+import { copyText, copyTextSync } from "../core/clipboard.ts";
 import { canNativeShare, nativeShare } from "../core/native.ts";
-import { shareTargetUrl } from "../core/targets.ts";
+import {
+  buildShareContext,
+  expandActions,
+  getShareTarget,
+  onShareTargetsChange,
+  isAllowedHref,
+  isTargetAvailable,
+  isWebUrl,
+  resolveAppScheme,
+  resolveTargetHref,
+  targetLabel,
+  validateTarget,
+  type ShareContext,
+  type ShareTarget,
+  type ShareTools,
+} from "../core/targets.ts";
+import { launchApp } from "../core/launch.ts";
 import { detectEnv, type ShareEnvironment } from "../core/env.ts";
 import { qrPngBlob, qrSvg } from "../core/qr.ts";
 import { LABELS, resolveLang, type ShareWidgetLabels } from "./labels.ts";
-import { icons } from "./icons.ts";
+import { icons, monogram } from "./icons.ts";
+import { brandIcon } from "./brand-icons.ts";
 import { styles } from "./styles.ts";
 
-export type ShareAction = "copy" | "qr" | "whatsapp" | "email" | "native";
+/** Built-in buttons, plus any registered share-target id ("telegram", "x", "wechat", …). */
+export type ShareAction = "copy" | "qr" | "native" | (string & {});
 export const DEFAULT_ACTIONS: readonly ShareAction[] = ["copy", "qr", "whatsapp", "native"];
-const KNOWN_ACTIONS = new Set<string>(["copy", "qr", "whatsapp", "email", "native"]);
 
 /** detail of the sw-copy / sw-share / sw-qr / sw-download / sw-open / sw-close events. */
 export interface ShareWidgetEventDetail {
+  /** What was used: "copy-link", "copy-button", "native", "wechat-hint", or a target id such as "telegram". */
   method: string;
+  /** The link that was shared (with UTM tags if enabled). */
   url: string;
   ok?: boolean;
+  /** native: "shared" | "cancelled" | "failed" | "unsupported"; app targets: "opened" | "not-opened" | "unknown". */
   result?: string;
   open?: boolean;
 }
+
+type Item =
+  | { kind: "builtin"; id: "copy" | "qr" | "native" }
+  | { kind: "target"; id: string; target: ShareTarget };
 
 // Lets the module be imported during server rendering, where HTMLElement does not exist.
 const Base = (typeof HTMLElement === "undefined" ? class {} : HTMLElement) as typeof HTMLElement;
@@ -38,6 +62,7 @@ export class ShareWidgetElement extends Base {
     "lang",
     "utm",
     "closable",
+    "brand-colors",
     "image",
     "preview-title",
     "preview-subtitle",
@@ -47,9 +72,12 @@ export class ShareWidgetElement extends Base {
   #root: ShadowRoot;
   #id = `sw${++instances}`;
   #labels: Partial<ShareWidgetLabels> = {};
+  #targets = new Map<string, ShareTarget>();
   #env: ShareEnvironment | null = null;
   #qrOpen = false;
   #timers = new Map<Element, ReturnType<typeof setTimeout>>();
+  #unsubscribe: (() => void) | null = null;
+  #renderQueued = false;
 
   constructor() {
     super();
@@ -63,6 +91,23 @@ export class ShareWidgetElement extends Base {
   }
   set labels(value: Partial<ShareWidgetLabels> | null | undefined) {
     this.#labels = { ...(value ?? {}) };
+    if (this.isConnected) this.#render();
+  }
+
+  /**
+   * Share targets for this widget only (they win over registered ones with the
+   * same id). List their ids in `actions` to show them.
+   */
+  get targets(): ShareTarget[] {
+    return [...this.#targets.values()];
+  }
+  set targets(value: ShareTarget[] | null | undefined) {
+    const next = new Map<string, ShareTarget>();
+    for (const target of value ?? []) {
+      validateTarget(target);
+      next.set(target.id, target);
+    }
+    this.#targets = next;
     if (this.isConnected) this.#render();
   }
 
@@ -87,7 +132,26 @@ export class ShareWidgetElement extends Base {
 
   connectedCallback(): void {
     this.#env ??= detectEnv();
+    // Targets registered after this widget rendered (e.g. by a later script) show up too.
+    this.#unsubscribe ??= onShareTargetsChange(() => this.#queueRender());
     this.#render();
+  }
+
+  disconnectedCallback(): void {
+    this.#unsubscribe?.();
+    this.#unsubscribe = null;
+    for (const timer of this.#timers.values()) clearTimeout(timer);
+    this.#timers.clear();
+  }
+
+  /** Re-render once after a burst of registry changes. */
+  #queueRender(): void {
+    if (this.#renderQueued) return;
+    this.#renderQueued = true;
+    queueMicrotask(() => {
+      this.#renderQueued = false;
+      if (this.isConnected) this.#render();
+    });
   }
 
   attributeChangedCallback(_name: string, oldValue: string | null, newValue: string | null): void {
@@ -96,9 +160,12 @@ export class ShareWidgetElement extends Base {
 
   // ---- data ---------------------------------------------------------------
 
+  #rawLang(): string {
+    return this.getAttribute("lang") || this.closest("[lang]")?.getAttribute("lang") || "en";
+  }
+
   #strings(): ShareWidgetLabels {
-    const lang = resolveLang(this.getAttribute("lang") ?? this.closest("[lang]")?.getAttribute("lang"));
-    return { ...LABELS[lang], ...this.#labels };
+    return { ...LABELS[resolveLang(this.#rawLang())], ...this.#labels };
   }
 
   #data(): ShareData | null {
@@ -117,15 +184,48 @@ export class ShareWidgetElement extends Base {
     return this.hasAttribute("utm") ? withShareSource(url, channel) : url;
   }
 
-  #actions(data: ShareData): ShareAction[] {
+  #template(): string | undefined {
+    return this.getAttribute("template") ?? undefined;
+  }
+
+  #lookup(id: string): ShareTarget | undefined {
+    return this.#targets.get(id) ?? getShareTarget(id);
+  }
+
+  #context(target: ShareTarget, data: ShareData): ShareContext {
+    return buildShareContext(
+      { ...data, url: this.#urlFor(target.id, data.url) },
+      {
+        template: this.#template(),
+        image: safeImage(this.getAttribute("image")) ?? "",
+        env: this.#env ?? detectEnv(),
+        lang: this.#rawLang(),
+      },
+    );
+  }
+
+  #items(data: ShareData): Item[] {
+    const env = this.#env ?? detectEnv();
     const raw = this.getAttribute("actions");
-    const requested = raw
-      ? raw.split(/[\s,]+/).filter((a): a is ShareAction => KNOWN_ACTIONS.has(a))
-      : [...DEFAULT_ACTIONS];
-    const unique = [...new Set(requested)];
-    // "More" is only useful where a native share sheet exists — or in WeChat,
-    // where it explains WeChat's own share menu instead.
-    return unique.filter((a) => a !== "native" || this.#env?.wechat || canNativeShare(data));
+    const ids = expandActions(raw ? raw.split(/[\s,]+/).filter(Boolean) : [...DEFAULT_ACTIONS]);
+    const seen = new Set<string>();
+    const items: Item[] = [];
+    for (const rawId of ids) {
+      const id = rawId.toLowerCase() === "more" ? "native" : rawId.toLowerCase();
+      if (id === "copy" || id === "qr" || id === "native") {
+        // "More" is only useful where a native share sheet exists — or in
+        // WeChat, where it explains WeChat's own share menu instead.
+        if (id === "native" && !env.wechat && !canNativeShare(data)) continue;
+        if (!seen.has(id)) items.push({ kind: "builtin", id });
+        seen.add(id);
+        continue;
+      }
+      const target = this.#lookup(id);
+      if (!target || seen.has(target.id) || !isTargetAvailable(target, env)) continue;
+      seen.add(target.id);
+      items.push({ kind: "target", id: target.id, target });
+    }
+    return items;
   }
 
   // ---- rendering ------------------------------------------------------------
@@ -143,7 +243,7 @@ export class ShareWidgetElement extends Base {
 
     const hint = `<div class="wx-hint" part="wechat-hint" role="dialog" aria-modal="true" aria-label="${esc(L.more)}" hidden>
         ${icons.arrow}
-        <p>${esc(L.wechatHint)}</p>
+        <p class="wx-hint-text">${esc(L.wechatHint)}</p>
         <button type="button" class="pill" data-action="hint-close">${esc(L.gotIt)}</button>
       </div>`;
 
@@ -168,39 +268,49 @@ export class ShareWidgetElement extends Base {
   }
 
   #cardBody(data: ShareData, L: ShareWidgetLabels, heading: string, headingId: string, isButton: boolean): string {
-    const actions = this.#actions(data);
+    const items = this.#items(data);
     const closable = isButton || this.hasAttribute("closable");
-    const displayUrl = data.url;
+    const brand = this.hasAttribute("brand-colors");
 
-    const button = (action: ShareAction, icon: string, label: string, extra = "") =>
-      `<button type="button" class="action" part="action action-${action}" data-action="${action}" ${extra}><span class="icon">${icon}</span><span class="label">${esc(label)}</span></button>`;
+    // brand-colors: app-icon style tiles in the brand colour, with a black or
+    // white glyph depending on how light the colour is.
+    const inner = (icon: string, label: string, color?: string) => {
+      const tile = brand && color && safeColor(color) ? ` style="--sw-tile:${color};--sw-on-tile:${onColor(color)}"` : "";
+      return `<span class="icon"${tile}>${icon}</span><span class="label">${esc(label)}</span>`;
+    };
 
-    const items = actions
-      .map((action, i) => {
-        const autofocus = i === 0 && isButton ? "autofocus" : "";
-        switch (action) {
-          case "copy":
-            return button("copy", icons.link, L.copyLink, `data-method="copy-link" ${autofocus}`);
-          case "qr":
-            return button(
-              "qr",
-              icons.qr,
-              L.qr,
-              `aria-expanded="${this.#qrOpen}" aria-controls="${this.#id}-qr" ${autofocus}`,
-            );
-          case "whatsapp":
-          case "email": {
-            const href = shareTargetUrl(action, { ...data, url: this.#urlFor(action, data.url) }, this.#template());
-            const target = action === "whatsapp" ? `target="_blank" rel="noopener noreferrer"` : "";
-            return `<a class="action" part="action action-${action}" data-action="${action}" href="${esc(href)}" ${target} ${autofocus}><span class="icon">${
-              action === "whatsapp" ? icons.chat : icons.mail
-            }</span><span class="label">${esc(action === "whatsapp" ? L.whatsapp : L.email)}</span></a>`;
+    const html = items
+      .map((item, i) => {
+        const autofocus = i === 0 && isButton ? " autofocus" : "";
+        if (item.kind === "builtin") {
+          switch (item.id) {
+            case "copy":
+              return `<button type="button" class="action" part="action action-copy" data-action="copy" data-method="copy-link"${autofocus}>${inner(icons.link, L.copyLink)}</button>`;
+            case "qr":
+              return `<button type="button" class="action" part="action action-qr" data-action="qr" aria-expanded="${this.#qrOpen}" aria-controls="${this.#id}-qr"${autofocus}>${inner(icons.qr, L.qr)}</button>`;
+            case "native":
+              return `<button type="button" class="action" part="action action-native" data-action="native"${autofocus}>${inner(icons.more, L.more)}</button>`;
           }
-          case "native":
-            return button("native", icons.more, L.more, autofocus);
         }
+        const { target } = item;
+        const label = targetLabel(target, this.#rawLang());
+        const icon = target.icon ?? brandIcon(target.id) ?? monogram(MONOGRAMS[target.id] ?? label, brand);
+        const part = `action action-target action-${esc(target.id)}`;
+        const isLink = !target.onSelect && !target.copy && !target.app;
+        const href = isLink ? resolveTargetHref(target, this.#context(target, data)) : null;
+        if (isLink && !href) return "";
+        if (href) {
+          const newTab = target.newTab ?? /^https?:/i.test(href);
+          return `<a class="action" part="${part}" data-action="target" data-target="${esc(target.id)}" href="${esc(href)}"${
+            newTab ? ` target="_blank" rel="noopener noreferrer"` : ""
+          }${autofocus}>${inner(icon, label, target.color)}</a>`;
+        }
+        return `<button type="button" class="action" part="${part}" data-action="target" data-target="${esc(target.id)}"${autofocus}>${inner(icon, label, target.color)}</button>`;
       })
-      .join("");
+      .filter(Boolean);
+
+    const count = html.length;
+    const cols = `--sw-cols:${Math.min(count, 4)};--sw-cols-wide:${Math.min(count, 6)}`;
 
     return `
       <div class="preview" part="preview" hidden>
@@ -211,14 +321,14 @@ export class ShareWidgetElement extends Base {
         <h2 class="heading" part="heading" id="${headingId}">${esc(heading)}</h2>
         ${closable ? `<button type="button" class="close" part="close" data-action="close" aria-label="${esc(L.close)}">${icons.close}</button>` : ""}
       </div>
-      ${actions.length ? `<div class="actions" part="actions" style="--sw-columns:${actions.length}">${items}</div>` : ""}
+      ${count ? `<div class="actions${brand ? " tiles" : ""}" part="actions" style="${cols}">${html.join("")}</div>` : ""}
       <div class="qr" part="qr" id="${this.#id}-qr" ${this.#qrOpen ? "" : "hidden"}>
         <div class="qr-code" part="qr-code" role="img" aria-label="${esc(L.qrAlt)}"></div>
         <p class="qr-hint">${esc(L.scanHint)}</p>
         <button type="button" class="pill outline" part="download" data-action="download">${icons.download}<span>${esc(L.download)}</span></button>
       </div>
       <div class="url-row" part="url-row">
-        <a class="url" part="url" href="${esc(data.url)}" target="_blank" rel="noopener noreferrer" title="${esc(L.openLink)}"><span class="url-text">${esc(displayUrl)}</span>${icons.external}</a>
+        <a class="url" part="url" href="${esc(data.url)}" target="_blank" rel="noopener noreferrer" title="${esc(L.openLink)}"><span class="url-text">${esc(data.url)}</span>${icons.external}</a>
         <button type="button" class="pill" part="copy-button" data-action="copy" data-method="copy-button">${esc(L.copy)}</button>
       </div>
       <p class="status" part="status" role="status" aria-live="polite"></p>`;
@@ -250,10 +360,6 @@ export class ShareWidgetElement extends Base {
     preview.hidden = divider.hidden = !has;
   }
 
-  #template(): string | undefined {
-    return this.getAttribute("template") ?? undefined;
-  }
-
   #fillQr(): void {
     const data = this.#data();
     const box = this.#root.querySelector<HTMLElement>(".qr-code");
@@ -282,7 +388,7 @@ export class ShareWidgetElement extends Base {
         this.close();
         return;
       case "hint-close":
-        this.#hint(false);
+        this.#hint(null);
         return;
     }
     if (!data) return;
@@ -292,18 +398,19 @@ export class ShareWidgetElement extends Base {
         void this.#copy(el, data);
         break;
       case "qr":
-        this.#toggleQr(el, data);
+        this.#toggleQr(data);
         break;
       case "download":
         void this.#download(data);
         break;
-      case "whatsapp":
-      case "email":
-        this.#emit("sw-share", { method: el.dataset.action, url: this.#urlFor(el.dataset.action, data.url) });
-        break;
       case "native":
         void this.#native(data);
         break;
+      case "target": {
+        const target = this.#lookup(el.dataset.target ?? "");
+        if (target) void this.#runTarget(target, data, el instanceof HTMLAnchorElement);
+        break;
+      }
     }
   }
 
@@ -315,15 +422,7 @@ export class ShareWidgetElement extends Base {
     this.#emit("sw-copy", { method, url, ok });
 
     if (!ok) {
-      this.#status(L.copyFailed, true);
-      const text = this.#root.querySelector(".url-text");
-      const selection = globalThis.getSelection?.();
-      if (text && selection) {
-        const range = document.createRange();
-        range.selectNodeContents(text);
-        selection.removeAllRanges();
-        selection.addRange(range);
-      }
+      this.#copyFailed();
       return;
     }
 
@@ -349,11 +448,24 @@ export class ShareWidgetElement extends Base {
     );
   }
 
-  #toggleQr(button: HTMLElement, data: ShareData): void {
-    this.#qrOpen = !this.#qrOpen;
+  /** Tell the user copying failed and select the link so they can copy it by hand. */
+  #copyFailed(): void {
+    this.#status(this.#strings().copyFailed, true);
+    const text = this.#root.querySelector(".url-text");
+    const selection = globalThis.getSelection?.();
+    if (text && selection) {
+      const range = document.createRange();
+      range.selectNodeContents(text);
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
+  }
+
+  #toggleQr(data: ShareData, force?: boolean): void {
+    this.#qrOpen = force ?? !this.#qrOpen;
     const panel = this.#root.querySelector<HTMLElement>(".qr");
     if (panel) panel.hidden = !this.#qrOpen;
-    button.setAttribute("aria-expanded", String(this.#qrOpen));
+    this.#root.querySelector('[data-action="qr"]')?.setAttribute("aria-expanded", String(this.#qrOpen));
     if (this.#qrOpen) this.#fillQr();
     this.#emit("sw-qr", { method: "qr", url: this.#urlFor("qr", data.url), open: this.#qrOpen });
   }
@@ -378,7 +490,7 @@ export class ShareWidgetElement extends Base {
 
   async #native(data: ShareData): Promise<void> {
     if (this.#env?.wechat) {
-      this.#hint(true);
+      this.#hint(this.#strings().wechatHint);
       this.#emit("sw-share", { method: "wechat-hint", url: data.url });
       return;
     }
@@ -388,15 +500,113 @@ export class ShareWidgetElement extends Base {
     if (result === "failed" || result === "unsupported") this.#status(this.#strings().shareFailed, true);
   }
 
-  #hint(show: boolean): void {
-    const hint = this.#root.querySelector<HTMLElement>(".wx-hint");
-    if (!hint) return;
-    hint.hidden = !show;
-    if (show) hint.querySelector<HTMLElement>("button")?.focus();
-    else this.#root.querySelector<HTMLElement>('[data-action="native"]')?.focus();
+  /**
+   * Run a share target. Link targets were rendered as <a>, so the browser
+   * already navigates — we only report it. Others copy and/or open an app, or
+   * run their own onSelect.
+   */
+  async #runTarget(target: ShareTarget, data: ShareData, isLink: boolean): Promise<void> {
+    const ctx = this.#context(target, data);
+    const L = this.#strings();
+    const name = targetLabel(target, this.#rawLang());
+    const report = (detail: Partial<ShareWidgetEventDetail>) =>
+      this.#emit("sw-share", { method: target.id, url: ctx.url, ...detail });
+
+    if (isLink) {
+      report({});
+      return;
+    }
+
+    if (target.onSelect) {
+      try {
+        await target.onSelect(ctx, this.#tools(data));
+        report({ ok: true });
+      } catch {
+        report({ ok: false });
+      }
+      return;
+    }
+
+    // 1. Already inside this app's browser (e.g. WeChat): its own ··· menu is the way to share.
+    if (target.insideApp?.(ctx.env)) {
+      this.#hint(target.id === "wechat" ? L.wechatHint : fill(L.menuHint, name));
+      report({ result: "menu-hint" });
+      return;
+    }
+
+    const copyValue = target.copy === "message" ? ctx.message : ctx.url;
+
+    // 2. Phone-first app on a computer: copy, and show the QR code to scan with the phone.
+    if (target.desktop === "qr" && !ctx.env.mobile) {
+      const ok = target.copy ? await copyText(copyValue) : true;
+      this.#toggleQr(data, true);
+      this.#status(fill(ok && target.copy ? L.copiedScan : L.scanWith, name), true);
+      report({ result: "qr", ok });
+      return;
+    }
+
+    const scheme = resolveAppScheme(target.app, ctx);
+    // 3. In-app browsers (WeChat, Instagram, TikTok…) block custom schemes: copy only.
+    const blocked = !!scheme && !isWebUrl(scheme) && ctx.env.inAppBrowser;
+
+    // 4. Copy first, synchronously: opening an app or tab takes focus away from
+    //    the page, and the async Clipboard API is refused once that happens.
+    //    Staying synchronous also keeps us inside the tap, which browsers
+    //    require for opening apps and tabs. Async copy is only the fallback.
+    if (target.copy) {
+      const copied = copyTextSync(copyValue) || (await copyText(copyValue));
+      if (!copied) {
+        this.#copyFailed();
+        report({ ok: false });
+        return;
+      }
+    }
+    let launching: Promise<string> = Promise.resolve("unknown");
+    if (scheme && !blocked) {
+      if (isWebUrl(scheme)) {
+        globalThis.open?.(scheme, "_blank", "noopener,noreferrer");
+      } else {
+        launching = launchApp(scheme);
+      }
+    }
+    if (!scheme || blocked) {
+      this.#status(fill(L.copiedPaste, name), true);
+      report({ result: blocked ? "blocked" : "copied", ok: true });
+      return;
+    }
+    this.#status(fill(target.copy ? L.copiedOpening : L.opening, name), true);
+    const result = await launching;
+    if (result === "not-opened") this.#status(fill(target.copy ? L.appNotOpenedCopied : L.appNotOpened, name), true);
+    report({ result, ok: result !== "not-opened" });
   }
 
-  /** Announce a message; `visible` also shows it under the panel (used for errors). */
+  #tools(data: ShareData): ShareTools {
+    return {
+      copy: (text) => copyText(text),
+      open: (url, newTab) => {
+        if (!isAllowedHref(url)) return;
+        const tab = newTab ?? /^https?:/i.test(url);
+        if (tab) globalThis.open?.(url, "_blank", "noopener,noreferrer");
+        else globalThis.location.href = url;
+      },
+      launchApp: (scheme) => (isAllowedHref(scheme) ? launchApp(scheme) : Promise.resolve("not-opened")),
+      status: (message, visible = true) => this.#status(message, visible),
+      openQr: () => this.#toggleQr(data, true),
+      pointToMenu: (message) => this.#hint(message),
+    };
+  }
+
+  /** Show the full-screen "tap ··· top-right" hint with a message, or hide it (null). */
+  #hint(message: string | null): void {
+    const hint = this.#root.querySelector<HTMLElement>(".wx-hint");
+    if (!hint) return;
+    const text = hint.querySelector(".wx-hint-text");
+    if (message !== null && text) text.textContent = message;
+    hint.hidden = message === null;
+    if (message !== null) hint.querySelector<HTMLElement>("button")?.focus();
+  }
+
+  /** Announce a message; `visible` also shows it under the panel (used for errors and app hand-offs). */
   #status(message: string, visible = false): void {
     const status = this.#root.querySelector(".status");
     if (!status) return;
@@ -410,6 +620,32 @@ export class ShareWidgetElement extends Base {
       new CustomEvent<ShareWidgetEventDetail>(name, { detail: { ...detail, url }, bubbles: true, composed: true, cancelable }),
     );
   }
+}
+
+/** Letters for built-in brands we don't ship a logo for. */
+const MONOGRAMS: Record<string, string> = { linkedin: "in", teams: "T", outlook: "O", slack: "S", band: "B", dingtalk: "D", qzone: "Q" };
+
+/** Black or white, whichever reads better on the given colour (hex only; others get white). */
+function onColor(color: string): string {
+  const hex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(color.trim())?.[1];
+  if (!hex) return "#fff";
+  const full = hex.length === 3 ? [...hex].map((c) => c + c).join("") : hex;
+  const [r, g, b] = [0, 2, 4].map((i) => {
+    const v = parseInt(full.slice(i, i + 2), 16) / 255;
+    return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+  }) as [number, number, number];
+  const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  // Contrast with white vs. with near-black (#111, luminance ≈ 0.0056).
+  return (1.05 / (luminance + 0.05)) >= ((luminance + 0.05) / 0.0556) ? "#fff" : "#111";
+}
+
+/** Only plain colour values may go into the inline style. */
+function safeColor(value: string): boolean {
+  return /^(#[0-9a-f]{3,8}|[a-z]{3,20}|(rgb|rgba|hsl|hsla|oklch|oklab)\([0-9.,%\s/-]+\))$/i.test(value.trim());
+}
+
+function fill(template: string, app: string): string {
+  return template.replace(/\{app\}/g, app);
 }
 
 function esc(value: string): string {
