@@ -1,4 +1,4 @@
-export interface ShareWidgetLabels {
+export interface ShareHopLabels {
   /** Trigger button text in button mode. */
   share: string;
   /** Panel heading when no `heading` attribute is set. */
@@ -33,9 +33,9 @@ export interface ShareWidgetLabels {
   menuHint: string;
 }
 
-export type ShareWidgetLang = "en" | "zh";
+export type ShareHopLang = "en" | "zh";
 
-export const LABELS: Record<ShareWidgetLang, ShareWidgetLabels> = {
+export const LABELS: Record<ShareHopLang, ShareHopLabels> = {
   en: {
     share: "Share",
     heading: "Share",
@@ -94,6 +94,6 @@ export const LABELS: Record<ShareWidgetLang, ShareWidgetLabels> = {
   },
 };
 
-export function resolveLang(value: string | null | undefined): ShareWidgetLang {
+export function resolveLang(value: string | null | undefined): ShareHopLang {
   return value && /^zh\b/i.test(value) ? "zh" : "en";
 }

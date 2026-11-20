@@ -1,13 +1,13 @@
-// A server component page. ShareWidget is a client component, so it can be
+// A server component page. ShareHop is a client component, so it can be
 // used here directly; the custom element is only registered in the browser.
-import { ShareWidget } from "share-panel-widget/react";
+import { ShareHop } from "sharehop/react";
 import { CopyCounter } from "./CopyCounter";
 
 export default function Page() {
   return (
     <main style={{ maxWidth: 720, margin: "0 auto", padding: "32px 16px" }}>
       <h1>Next.js example</h1>
-      <ShareWidget
+      <ShareHop
         url="https://example.com/marketplace/27-inch-monitor"
         shareTitle="27-inch Monitor"
         shareText="$85 · pickup in New Brunswick"
@@ -19,7 +19,7 @@ export default function Page() {
       />
       <p style={{ marginTop: 32 }}>
         Button mode in a header:{" "}
-        <ShareWidget
+        <ShareHop
           mode="button"
           url="https://example.com/clubs/chess-club"
           shareTitle="Chess Club"

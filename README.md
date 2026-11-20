@@ -1,6 +1,6 @@
-# share-widget
+# sharehop
 
-A small share panel for any website: **copy link, QR code (with PNG download), the phone's native share sheet, and 40+ apps** — WhatsApp, WeChat, Instagram, LINE, X, Weibo, Xiaohongshu, KakaoTalk, Telegram… — plus **a plug-in API to add your own**. One framework-free Web Component, with a thin React wrapper.
+**Share to any app in one hop.** A small share panel for any website: **copy link, QR code (with PNG download), the phone's native share sheet, and 40+ apps** — WhatsApp, WeChat, Instagram, LINE, X, Weibo, Xiaohongshu, KakaoTalk, Telegram… — plus **a plug-in API to add your own**. One framework-free Web Component, with a thin React wrapper.
 
 ![Share panel with a listing preview, four share actions and a copy-link row](docs/screenshot.png)
 
@@ -31,35 +31,35 @@ The demo uses made-up listings and links only.
 ### Script tag (any website)
 
 ```html
-<script src="https://unpkg.com/share-panel-widget/dist/share-widget.global.js"></script>
+<script src="https://unpkg.com/sharehop/dist/sharehop.global.js"></script>
 
-<share-widget
+<share-hop
   url="https://example.com/marketplace/27-inch-monitor"
   share-title="27-inch Monitor"
   share-text="$85 · pickup in New Brunswick"
   heading="Share this listing"
   actions="copy,qr,whatsapp,wechat,instagram,native">
-</share-widget>
+</share-hop>
 ```
 
-Leave out `url` to share the current page. `share-widget.global.js` is ~35 KB gzipped with all brand logos; `share-widget.lite.global.js` (~19 KB) shows letter icons instead.
+Leave out `url` to share the current page. `sharehop.global.js` is ~35 KB gzipped with all brand logos; `sharehop.lite.global.js` (~19 KB) shows letter icons instead.
 
 ### npm + bundler
 
 ```bash
-npm install share-panel-widget
+npm install sharehop
 ```
 
 ```js
-import "share-panel-widget/define"; // registers <share-widget>
+import "sharehop/define"; // registers <share-hop>
 ```
 
 ### React / Next.js
 
 ```tsx
-import { ShareWidget } from "share-panel-widget/react";
+import { ShareHop } from "sharehop/react";
 
-<ShareWidget
+<ShareHop
   url="https://example.com/clubs/chess-club"
   shareTitle="Chess Club"
   shareText="Wednesdays 7pm, beginners welcome"
@@ -71,7 +71,7 @@ import { ShareWidget } from "share-panel-widget/react";
 />;
 ```
 
-`ShareWidget` is a client component and registers the element in the browser only, so it can be placed in a server component. Event props (`onCopy`, `onShare`, …) and `targets` need a client component, as usual. See [`examples/next-app`](examples/next-app).
+`ShareHop` is a client component and registers the element in the browser only, so it can be placed in a server component. Event props (`onCopy`, `onShare`, …) and `targets` need a client component, as usual. See [`examples/next-app`](examples/next-app).
 
 ## Apps
 
@@ -80,7 +80,7 @@ import { ShareWidget } from "share-panel-widget/react";
 List app ids in `actions`, in the order you want them, mixed freely with `copy`, `qr` and `native` (the "More" button):
 
 ```html
-<share-widget actions="copy,whatsapp,wechat,instagram,x,native" brand-colors></share-widget>
+<share-hop actions="copy,whatsapp,wechat,instagram,x,native" brand-colors></share-hop>
 ```
 
 | Kind | Apps (`id`) |
@@ -106,7 +106,7 @@ Some only appear where they can work: `sms`, `messenger`, `viber`, `kakaotalk`, 
 | `@japan` | line, x, hatena |
 
 ```html
-<share-widget lang="zh" actions="copy,qr,@china" brand-colors></share-widget>
+<share-hop lang="zh" actions="copy,qr,@china" brand-colors></share-hop>
 ```
 
 Services blocked in mainland China (X, Facebook, WhatsApp, Telegram, LINE, Google) are left out of `@china`.
@@ -123,7 +123,7 @@ Services blocked in mainland China (X, Facebook, WhatsApp, Telegram, LINE, Googl
 Register a share target once, then use its id in `actions` on any widget. Widgets already on the page update.
 
 ```js
-import { registerShareTarget } from "share-panel-widget"; // or window.ShareWidget with the script tag
+import { registerShareTarget } from "sharehop"; // or window.ShareHop with the script tag
 
 registerShareTarget({
   id: "campusforum",                       // lowercase letters, digits, dashes
@@ -135,7 +135,7 @@ registerShareTarget({
 ```
 
 ```html
-<share-widget actions="copy,campusforum,x,native"></share-widget>
+<share-hop actions="copy,campusforum,x,native"></share-hop>
 ```
 
 `href` placeholders are URL-encoded for you: `{url}`, `{title}`, `{text}`, `{message}` (title — text + newline + link), `{summary}` (the message without the link), `{image}`, `{host}`.
@@ -212,15 +212,15 @@ Without the widget, `shareTargetUrl("telegram", { url, title, text })` returns t
 | `lang` | `lang` | page language | `en` or `zh` for the widget's text (app names also have `ko`, `ja`, `ru` where they differ). Falls back to the nearest `lang` attribute, then English. |
 | `theme` | `theme` | `auto` | `light`, `dark` or `auto` (follows the system). |
 | `utm` | `utm` | off | Adds `utm_source=<channel>&utm_medium=share` to shared links (`copy`, `qr`, `native` or the app id). The visible link stays clean. |
-| `closable` | `closable` | off | Shows a × in panel mode. Clicking it hides the widget unless `sw-close` is cancelled. |
+| `closable` | `closable` | off | Shows a × in panel mode. Clicking it hides the widget unless `sh-close` is cancelled. |
 | `image`, `preview-title`, `preview-subtitle`, `preview-meta` | `image`, `previewTitle`, … | — | Optional preview card above the panel (image, title, a bold line such as a price, a muted line). `image` (if it is an absolute http(s) URL) is also sent to Pinterest, Weibo, Qzone and others. |
 
 For a fully custom preview, put your own markup in the `preview` slot (in React: pass `children`):
 
 ```html
-<share-widget url="…">
+<share-hop url="…">
   <div slot="preview">…</div>
-</share-widget>
+</share-hop>
 ```
 
 ### Text
@@ -228,7 +228,7 @@ For a fully custom preview, put your own markup in the `preview` slot (in React:
 Override any built-in text with the `labels` property:
 
 ```js
-document.querySelector("share-widget").labels = { copyLink: "Copy store link", qr: "Scan" };
+document.querySelector("share-hop").labels = { copyLink: "Copy store link", qr: "Scan" };
 ```
 
 Keys: `share, heading, copyLink, qr, more, copy, copied, linkCopied, copyFailed, shareFailed, openLink, close, scanHint, download, qrAlt, wechatHint, gotIt, noUrl, copiedOpening, opening, appNotOpened, appNotOpenedCopied, copiedPaste, copiedScan, scanWith, menuHint` (`{app}` in the last ones is replaced by the app's name).
@@ -242,22 +242,22 @@ Keys: `share, heading, copyLink, qr, more, copy, copied, linkCopied, copyFailed,
 Set CSS variables on the element or any ancestor:
 
 ```css
-share-widget {
-  --sw-accent: #b45309;      /* Copy button background */
-  --sw-on-accent: #fff;      /* Copy button text */
-  --sw-radius: 14px;         /* card corner radius */
-  --sw-font: Georgia, serif;
-  --sw-bg: #fff;  --sw-fg: #111;  --sw-muted: #6b6b6b;  --sw-border: #e7e7e7;
-  --sw-hover: rgba(0,0,0,.05);  --sw-focus: #2563eb;  --sw-success: #15803d;
-  --sw-tile: rgba(0,0,0,.06); /* neutral icon tiles with brand-colors */
+share-hop {
+  --sh-accent: #b45309;      /* Copy button background */
+  --sh-on-accent: #fff;      /* Copy button text */
+  --sh-radius: 14px;         /* card corner radius */
+  --sh-font: Georgia, serif;
+  --sh-bg: #fff;  --sh-fg: #111;  --sh-muted: #6b6b6b;  --sh-border: #e7e7e7;
+  --sh-hover: rgba(0,0,0,.05);  --sh-focus: #2563eb;  --sh-success: #15803d;
+  --sh-tile: rgba(0,0,0,.06); /* neutral icon tiles with brand-colors */
 }
 ```
 
-For deeper changes, style the exposed parts: `share-widget::part(card)`, `heading`, `actions`, `action`, `action-copy`, `action-qr`, `action-native`, `action-target`, `action-<app id>` (e.g. `action-wechat`), `qr`, `qr-code`, `download`, `url-row`, `url`, `copy-button`, `status`, `trigger`, `dialog`, `close`, `preview`, `preview-image`, `preview-title`, `preview-subtitle`, `preview-meta`, `divider`, `wechat-hint`.
+For deeper changes, style the exposed parts: `share-hop::part(card)`, `heading`, `actions`, `action`, `action-copy`, `action-qr`, `action-native`, `action-target`, `action-<app id>` (e.g. `action-wechat`), `qr`, `qr-code`, `download`, `url-row`, `url`, `copy-button`, `status`, `trigger`, `dialog`, `close`, `preview`, `preview-image`, `preview-title`, `preview-subtitle`, `preview-meta`, `divider`, `wechat-hint`.
 
 Buttons are laid out in as many columns as fit (about 4 on a phone, more on a wide card); extra ones wrap onto further rows.
 
-To avoid a flash before the script loads, you can reserve space: `share-widget:not(:defined) { display: block; min-height: 180px; }`.
+To avoid a flash before the script loads, you can reserve space: `share-hop:not(:defined) { display: block; min-height: 180px; }`.
 
 ## Events
 
@@ -265,14 +265,14 @@ Every event bubbles out of the element with `detail.method` and `detail.url` (th
 
 | Event | When | Extra detail |
 | --- | --- | --- |
-| `sw-copy` | A copy button was clicked | `ok` — whether copying worked |
-| `sw-share` | An app or the native share was used | `method`: the app id, `native` or `wechat-hint`. `result` for native: `shared`, `cancelled`, `failed`, `unsupported`; for app launches: `opened`, `not-opened`, `unknown`, `blocked`, `copied`, `qr`, `menu-hint`. `ok` where known |
-| `sw-qr` | QR panel opened or closed | `open` |
-| `sw-download` | QR PNG downloaded | `ok` |
-| `sw-open` / `sw-close` | Dialog opened / closed (or panel closed with ×) | `sw-close` from × is cancelable |
+| `sh-copy` | A copy button was clicked | `ok` — whether copying worked |
+| `sh-share` | An app or the native share was used | `method`: the app id, `native` or `wechat-hint`. `result` for native: `shared`, `cancelled`, `failed`, `unsupported`; for app launches: `opened`, `not-opened`, `unknown`, `blocked`, `copied`, `qr`, `menu-hint`. `ok` where known |
+| `sh-qr` | QR panel opened or closed | `open` |
+| `sh-download` | QR PNG downloaded | `ok` |
+| `sh-open` / `sh-close` | Dialog opened / closed (or panel closed with ×) | `sh-close` from × is cancelable |
 
 ```js
-document.addEventListener("sw-share", (e) => analytics.track("share", e.detail));
+document.addEventListener("sh-share", (e) => analytics.track("share", e.detail));
 ```
 
 ## WeChat and link previews

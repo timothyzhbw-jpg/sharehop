@@ -1,5 +1,5 @@
 {
-  "name": "share-panel-widget",
+  "name": "sharehop",
   "version": "0.2.0",
   "description": "A small, framework-free share panel for any website: copy link, QR code, native share and 40+ apps (WhatsApp, WeChat, X, LINE, Weibo…) with a plug-in API for your own — as a Web Component with a thin React wrapper.",
   "license": "MIT",
@@ -17,8 +17,8 @@
   ],
   "sideEffects": [
     "./dist/element/define.js",
-    "./dist/share-widget.global.js",
-    "./dist/share-widget.lite.global.js"
+    "./dist/sharehop.global.js",
+    "./dist/sharehop.lite.global.js"
   ],
   "exports": {
     ".": {
@@ -37,8 +37,8 @@
       "types": "./dist/react/index.d.ts",
       "default": "./dist/react/index.js"
     },
-    "./global": "./dist/share-widget.global.js",
-    "./lite": "./dist/share-widget.lite.global.js"
+    "./global": "./dist/sharehop.global.js",
+    "./lite": "./dist/sharehop.lite.global.js"
   },
   "files": [
     "dist",

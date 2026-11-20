@@ -1,5 +1,5 @@
 {
-  "name": "share-widget-next-example",
+  "name": "sharehop-next-example",
   "private": true,
   "type": "module",
   "scripts": {
@@ -11,7 +11,7 @@
     "next": "16.4.6",
     "react": "19.3.1",
     "react-dom": "19.3.1",
-    "share-panel-widget": "file:../.."
+    "sharehop": "file:../.."
   },
   "devDependencies": {
     "@types/node": "^24",

@@ -1,6 +1,6 @@
-// Side-effect entry: `import "share-panel-widget/define"` registers <share-widget>.
-import { defineShareWidget } from "./share-widget.ts";
+// Side-effect entry: `import "sharehop/define"` registers <share-hop>.
+import { defineShareHop } from "./sharehop.ts";
 
-defineShareWidget();
+defineShareHop();
 
-export { defineShareWidget };
+export { defineShareHop };

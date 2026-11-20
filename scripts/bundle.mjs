@@ -1,6 +1,6 @@
 // Builds the single-file <script> bundles (uqr included):
-//   dist/share-widget.global.js       — with brand logos
-//   dist/share-widget.lite.global.js  — letter icons instead of logos (much smaller)
+//   dist/sharehop.global.js       — with brand logos
+//   dist/sharehop.lite.global.js  — letter icons instead of logos (much smaller)
 // The ESM build (for bundlers) comes from tsc.
 import { build } from "esbuild";
 
@@ -9,7 +9,7 @@ const common = {
   entryPoints: [entry],
   bundle: true,
   format: "iife",
-  globalName: "ShareWidget",
+  globalName: "ShareHop",
   minify: true,
   target: ["es2022", "safari15.4"],
   legalComments: "eof",
@@ -17,8 +17,8 @@ const common = {
 
 await build({
   ...common,
-  outfile: new URL("../dist/share-widget.global.js", import.meta.url).pathname,
-  banner: { js: "/*! share-panel-widget | MIT | includes uqr (MIT) and simple-icons paths (CC0-1.0); brand logos are trademarks of their owners */" },
+  outfile: new URL("../dist/sharehop.global.js", import.meta.url).pathname,
+  banner: { js: "/*! sharehop | MIT | includes uqr (MIT) and simple-icons paths (CC0-1.0); brand logos are trademarks of their owners */" },
 });
 
 const noLogos = {
@@ -34,7 +34,7 @@ const noLogos = {
 
 await build({
   ...common,
-  outfile: new URL("../dist/share-widget.lite.global.js", import.meta.url).pathname,
-  banner: { js: "/*! share-panel-widget (lite) | MIT | includes uqr (MIT) */" },
+  outfile: new URL("../dist/sharehop.lite.global.js", import.meta.url).pathname,
+  banner: { js: "/*! sharehop (lite) | MIT | includes uqr (MIT) */" },
   plugins: [noLogos],
 });

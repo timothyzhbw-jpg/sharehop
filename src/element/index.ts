@@ -1,4 +1,4 @@
-export { ShareWidgetElement, DEFAULT_ACTIONS, defineShareWidget } from "./share-widget.ts";
-export type { ShareAction, ShareWidgetEventDetail } from "./share-widget.ts";
+export { ShareHopElement, DEFAULT_ACTIONS, defineShareHop } from "./sharehop.ts";
+export type { ShareAction, ShareHopEventDetail } from "./sharehop.ts";
 export { LABELS, resolveLang } from "./labels.ts";
-export type { ShareWidgetLabels, ShareWidgetLang } from "./labels.ts";
+export type { ShareHopLabels, ShareHopLang } from "./labels.ts";

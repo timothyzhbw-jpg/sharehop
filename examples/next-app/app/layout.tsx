@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-export const metadata = { title: "share-widget · Next.js example" };
+export const metadata = { title: "sharehop · Next.js example" };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (

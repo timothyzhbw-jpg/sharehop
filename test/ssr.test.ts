@@ -6,8 +6,8 @@ import assert from "node:assert/strict";
 test("element and define entries import cleanly without a DOM", async () => {
   assert.equal(typeof (globalThis as { HTMLElement?: unknown }).HTMLElement, "undefined");
   const element = await import("../src/element/index.ts");
-  assert.equal(typeof element.ShareWidgetElement, "function");
-  assert.doesNotThrow(() => element.defineShareWidget());
+  assert.equal(typeof element.ShareHopElement, "function");
+  assert.doesNotThrow(() => element.defineShareHop());
   await import("../src/element/define.ts");
 });
 

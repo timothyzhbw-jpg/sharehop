@@ -1,26 +1,26 @@
 const light = `
-  --_bg: var(--sw-bg, #ffffff);
-  --_fg: var(--sw-fg, #111111);
-  --_muted: var(--sw-muted, #6b6b6b);
-  --_border: var(--sw-border, #e7e7e7);
-  --_hover: var(--sw-hover, rgba(0, 0, 0, 0.05));
-  --_accent: var(--sw-accent, #111111);
-  --_on-accent: var(--sw-on-accent, #ffffff);
-  --_focus: var(--sw-focus, #2563eb);
-  --_success: var(--sw-success, #15803d);
+  --_bg: var(--sh-bg, #ffffff);
+  --_fg: var(--sh-fg, #111111);
+  --_muted: var(--sh-muted, #6b6b6b);
+  --_border: var(--sh-border, #e7e7e7);
+  --_hover: var(--sh-hover, rgba(0, 0, 0, 0.05));
+  --_accent: var(--sh-accent, #111111);
+  --_on-accent: var(--sh-on-accent, #ffffff);
+  --_focus: var(--sh-focus, #2563eb);
+  --_success: var(--sh-success, #15803d);
   --_tile: rgba(0, 0, 0, 0.06);
 `;
 
 const dark = `
-  --_bg: var(--sw-bg, #1c1c1e);
-  --_fg: var(--sw-fg, #f2f2f2);
-  --_muted: var(--sw-muted, #a1a1a6);
-  --_border: var(--sw-border, #38383a);
-  --_hover: var(--sw-hover, rgba(255, 255, 255, 0.07));
-  --_accent: var(--sw-accent, #f2f2f2);
-  --_on-accent: var(--sw-on-accent, #111111);
-  --_focus: var(--sw-focus, #60a5fa);
-  --_success: var(--sw-success, #4ade80);
+  --_bg: var(--sh-bg, #1c1c1e);
+  --_fg: var(--sh-fg, #f2f2f2);
+  --_muted: var(--sh-muted, #a1a1a6);
+  --_border: var(--sh-border, #38383a);
+  --_hover: var(--sh-hover, rgba(255, 255, 255, 0.07));
+  --_accent: var(--sh-accent, #f2f2f2);
+  --_on-accent: var(--sh-on-accent, #111111);
+  --_focus: var(--sh-focus, #60a5fa);
+  --_success: var(--sh-success, #4ade80);
   --_tile: rgba(255, 255, 255, 0.1);
 `;
 
@@ -29,7 +29,7 @@ export const styles: string = `
   ${light}
   display: block;
   color: var(--_fg);
-  font: 400 15px/1.45 var(--sw-font, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif);
+  font: 400 15px/1.45 var(--sh-font, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif);
   -webkit-tap-highlight-color: transparent;
 }
 :host([mode="button"]) { display: inline-block; }
@@ -49,14 +49,14 @@ svg { display: block; flex: none; }
 .card {
   background: var(--_bg);
   border: 1px solid var(--_border);
-  border-radius: var(--sw-radius, 24px);
+  border-radius: var(--sh-radius, 24px);
   padding: 24px;
 }
 
 .preview { display: flex; gap: 20px; align-items: center; }
 .preview img {
   width: 108px; height: 108px; object-fit: cover; flex: none;
-  border-radius: calc(var(--sw-radius, 24px) * 0.75);
+  border-radius: calc(var(--sh-radius, 24px) * 0.75);
   background: var(--_hover);
 }
 .preview p { margin: 0; }
@@ -93,7 +93,7 @@ svg { display: block; flex: none; }
 .tiles .action { gap: 8px; }
 .tiles .icon {
   display: grid; place-items: center; width: 48px; height: 48px; border-radius: 14px;
-  background: var(--sw-tile, var(--_tile)); color: var(--sw-on-tile, var(--_fg));
+  background: var(--sh-tile, var(--_tile)); color: var(--sh-on-tile, var(--_fg));
 }
 .tiles .icon svg { width: 26px; height: 26px; }
 .tiles .action.is-done .icon { color: var(--_success); }
@@ -173,7 +173,7 @@ dialog.wx-hint::backdrop { background: transparent; }
 @media (max-width: 640px) {
   dialog:not(.wx-hint) { width: 100vw; margin: auto 0 0; max-height: 90dvh; }
   dialog .card {
-    border-radius: var(--sw-radius, 24px) var(--sw-radius, 24px) 0 0; border-bottom: 0;
+    border-radius: var(--sh-radius, 24px) var(--sh-radius, 24px) 0 0; border-bottom: 0;
     padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
   }
 }

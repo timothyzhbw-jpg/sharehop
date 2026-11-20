@@ -20,7 +20,7 @@ import {
 import { launchApp } from "../core/launch.ts";
 import { detectEnv, type ShareEnvironment } from "../core/env.ts";
 import { qrPngBlob, qrSvg } from "../core/qr.ts";
-import { LABELS, resolveLang, type ShareWidgetLabels } from "./labels.ts";
+import { LABELS, resolveLang, type ShareHopLabels } from "./labels.ts";
 import { icons, monogram } from "./icons.ts";
 import { brandIcon } from "./brand-icons.ts";
 import { styles } from "./styles.ts";
@@ -29,8 +29,8 @@ import { styles } from "./styles.ts";
 export type ShareAction = "copy" | "qr" | "native" | (string & {});
 export const DEFAULT_ACTIONS: readonly ShareAction[] = ["copy", "qr", "whatsapp", "native"];
 
-/** detail of the sw-copy / sw-share / sw-qr / sw-download / sw-open / sw-close events. */
-export interface ShareWidgetEventDetail {
+/** detail of the sh-copy / sh-share / sh-qr / sh-download / sh-open / sh-close events. */
+export interface ShareHopEventDetail {
   /** What was used: "copy-link", "copy-button", "native", "wechat-hint", or a target id such as "telegram". */
   method: string;
   /** The link that was shared (with UTM tags if enabled). */
@@ -50,7 +50,7 @@ const Base = (typeof HTMLElement === "undefined" ? class {} : HTMLElement) as ty
 
 let instances = 0;
 
-export class ShareWidgetElement extends Base {
+export class ShareHopElement extends Base {
   static observedAttributes = [
     "url",
     "share-title",
@@ -70,8 +70,8 @@ export class ShareWidgetElement extends Base {
   ];
 
   #root: ShadowRoot;
-  #id = `sw${++instances}`;
-  #labels: Partial<ShareWidgetLabels> = {};
+  #id = `sh${++instances}`;
+  #labels: Partial<ShareHopLabels> = {};
   #targets = new Map<string, ShareTarget>();
   #env: ShareEnvironment | null = null;
   #qrOpen = false;
@@ -92,10 +92,10 @@ export class ShareWidgetElement extends Base {
   }
 
   /** Override any built-in text, e.g. `el.labels = { heading: "Share this listing" }`. */
-  get labels(): Partial<ShareWidgetLabels> {
+  get labels(): Partial<ShareHopLabels> {
     return { ...this.#labels };
   }
-  set labels(value: Partial<ShareWidgetLabels> | null | undefined) {
+  set labels(value: Partial<ShareHopLabels> | null | undefined) {
     this.#labels = { ...(value ?? {}) };
     if (this.isConnected) this.#render();
   }
@@ -124,7 +124,7 @@ export class ShareWidgetElement extends Base {
     const dialog = this.#root.querySelector<HTMLDialogElement>("dialog:not(.wx-hint)");
     if (dialog && !dialog.open) {
       dialog.showModal();
-      this.#emit("sw-open", { method: "dialog" });
+      this.#emit("sh-open", { method: "dialog" });
     }
   }
 
@@ -135,7 +135,7 @@ export class ShareWidgetElement extends Base {
       dialog.close();
       return;
     }
-    if (this.#emit("sw-close", { method: "panel" }, true)) this.hidden = true;
+    if (this.#emit("sh-close", { method: "panel" }, true)) this.hidden = true;
   }
 
   connectedCallback(): void {
@@ -172,7 +172,7 @@ export class ShareWidgetElement extends Base {
     return this.getAttribute("lang") || this.closest("[lang]")?.getAttribute("lang") || "en";
   }
 
-  #strings(): ShareWidgetLabels {
+  #strings(): ShareHopLabels {
     return { ...LABELS[resolveLang(this.#rawLang())], ...this.#labels };
   }
 
@@ -281,7 +281,7 @@ export class ShareWidgetElement extends Base {
       dialog.addEventListener("close", () => {
         if (this.#rerendering) return;
         this.#root.querySelector<HTMLElement>(".trigger")?.focus();
-        this.#emit("sw-close", { method: "dialog" });
+        this.#emit("sh-close", { method: "dialog" });
       });
       if (wasOpen && this.isConnected) dialog.showModal();
     }
@@ -303,7 +303,7 @@ export class ShareWidgetElement extends Base {
     if (this.#qrOpen) this.#fillQr();
   }
 
-  #cardBody(data: ShareData, L: ShareWidgetLabels, heading: string, headingId: string, isButton: boolean): string {
+  #cardBody(data: ShareData, L: ShareHopLabels, heading: string, headingId: string, isButton: boolean): string {
     const items = this.#items(data);
     const closable = isButton || this.hasAttribute("closable");
     const brand = this.hasAttribute("brand-colors");
@@ -311,7 +311,7 @@ export class ShareWidgetElement extends Base {
     // brand-colors: app-icon style tiles in the brand colour, with a black or
     // white glyph depending on how light the colour is.
     const inner = (icon: string, label: string, color?: string) => {
-      const tile = brand && color && safeColor(color) ? ` style="--sw-tile:${color};--sw-on-tile:${onColor(color)}"` : "";
+      const tile = brand && color && safeColor(color) ? ` style="--sh-tile:${color};--sh-on-tile:${onColor(color)}"` : "";
       return `<span class="icon"${tile}>${icon}</span><span class="label">${esc(label)}</span>`;
     };
 
@@ -463,7 +463,7 @@ export class ShareWidgetElement extends Base {
     const method = button.dataset.method ?? "copy";
     const url = this.#urlFor("copy", data.url);
     const ok = await copyText(url, this.#copyContainer());
-    this.#emit("sw-copy", { method, url, ok });
+    this.#emit("sh-copy", { method, url, ok });
 
     if (!ok) {
       this.#copyFailed();
@@ -511,7 +511,7 @@ export class ShareWidgetElement extends Base {
     if (panel) panel.hidden = !this.#qrOpen;
     this.#root.querySelector('[data-action="qr"]')?.setAttribute("aria-expanded", String(this.#qrOpen));
     if (this.#qrOpen) this.#fillQr();
-    this.#emit("sw-qr", { method: "qr", url: this.#urlFor("qr", data.url), open: this.#qrOpen });
+    this.#emit("sh-qr", { method: "qr", url: this.#urlFor("qr", data.url), open: this.#qrOpen });
   }
 
   async #download(data: ShareData): Promise<void> {
@@ -526,21 +526,21 @@ export class ShareWidgetElement extends Base {
       a.click();
       a.remove();
       setTimeout(() => URL.revokeObjectURL(href), 10_000);
-      this.#emit("sw-download", { method: "png", url, ok: true });
+      this.#emit("sh-download", { method: "png", url, ok: true });
     } catch {
-      this.#emit("sw-download", { method: "png", url, ok: false });
+      this.#emit("sh-download", { method: "png", url, ok: false });
     }
   }
 
   async #native(data: ShareData): Promise<void> {
     if (this.#env?.wechat) {
       this.#hint(this.#strings().wechatHint, this.#root.querySelector<HTMLElement>('[data-action="native"]'));
-      this.#emit("sw-share", { method: "wechat-hint", url: data.url });
+      this.#emit("sh-share", { method: "wechat-hint", url: data.url });
       return;
     }
     const url = this.#urlFor("native", data.url);
     const result = await nativeShare({ ...data, url }, this.#template());
-    this.#emit("sw-share", { method: "native", url, result, ok: result === "shared" });
+    this.#emit("sh-share", { method: "native", url, result, ok: result === "shared" });
     if (result === "failed" || result === "unsupported") this.#status(this.#strings().shareFailed, true);
   }
 
@@ -553,8 +553,8 @@ export class ShareWidgetElement extends Base {
     const ctx = this.#context(target, data);
     const L = this.#strings();
     const name = targetLabel(target, this.#rawLang());
-    const report = (detail: Partial<ShareWidgetEventDetail>) =>
-      this.#emit("sw-share", { method: target.id, url: ctx.url, ...detail });
+    const report = (detail: Partial<ShareHopEventDetail>) =>
+      this.#emit("sh-share", { method: target.id, url: ctx.url, ...detail });
     const copyNow = async (value: string) =>
       copyTextSync(value, this.#copyContainer()) || (await copyText(value, this.#copyContainer()));
 
@@ -679,10 +679,10 @@ export class ShareWidgetElement extends Base {
     status.textContent = message;
   }
 
-  #emit(name: string, detail: Partial<ShareWidgetEventDetail> & { method: string }, cancelable = false): boolean {
+  #emit(name: string, detail: Partial<ShareHopEventDetail> & { method: string }, cancelable = false): boolean {
     const url = detail.url ?? this.#data()?.url ?? "";
     return this.dispatchEvent(
-      new CustomEvent<ShareWidgetEventDetail>(name, { detail: { ...detail, url }, bubbles: true, composed: true, cancelable }),
+      new CustomEvent<ShareHopEventDetail>(name, { detail: { ...detail, url }, bubbles: true, composed: true, cancelable }),
     );
   }
 }
@@ -741,13 +741,13 @@ function slug(value: string | undefined): string {
 }
 
 /**
- * Register the element (default tag "share-widget"). Safe to call more than
+ * Register the element (default tag "share-hop"). Safe to call more than
  * once and safe to call on the server, where it does nothing.
  */
-export function defineShareWidget(tagName = "share-widget"): void {
+export function defineShareHop(tagName = "share-hop"): void {
   const registry = globalThis.customElements;
   if (!registry || registry.get(tagName)) return;
   // A constructor can only be registered once, so other tag names get a subclass.
-  const used = registry.getName?.(ShareWidgetElement);
-  registry.define(tagName, used ? class extends ShareWidgetElement {} : ShareWidgetElement);
+  const used = registry.getName?.(ShareHopElement);
+  registry.define(tagName, used ? class extends ShareHopElement {} : ShareHopElement);
 }

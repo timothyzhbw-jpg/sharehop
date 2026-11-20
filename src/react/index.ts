@@ -1,15 +1,15 @@
 "use client";
 
 import { createElement, useEffect, useRef, type CSSProperties, type ReactNode } from "react";
-import type { ShareAction, ShareWidgetEventDetail } from "../element/share-widget.ts";
-import type { ShareWidgetLabels } from "../element/labels.ts";
+import type { ShareAction, ShareHopEventDetail } from "../element/sharehop.ts";
+import type { ShareHopLabels } from "../element/labels.ts";
 import type { ShareTarget } from "../core/targets.ts";
 
-export type { ShareAction, ShareWidgetEventDetail, ShareWidgetLabels, ShareTarget };
+export type { ShareAction, ShareHopEventDetail, ShareHopLabels, ShareTarget };
 
-export type ShareWidgetEvent = CustomEvent<ShareWidgetEventDetail>;
+export type ShareHopEvent = CustomEvent<ShareHopEventDetail>;
 
-export interface ShareWidgetProps {
+export interface ShareHopProps {
   /** Link to share. Defaults to the current page. Relative URLs are resolved. */
   url?: string;
   /** Used in the share message, the native sheet title and the email subject. */
@@ -40,35 +40,35 @@ export interface ShareWidgetProps {
   previewSubtitle?: string;
   previewMeta?: string;
   /** Override built-in text. */
-  labels?: Partial<ShareWidgetLabels>;
+  labels?: Partial<ShareHopLabels>;
   /** Custom preview content (rendered into the widget's preview slot). */
   children?: ReactNode;
   className?: string;
   style?: CSSProperties;
   id?: string;
-  onCopy?: (event: ShareWidgetEvent) => void;
-  onShare?: (event: ShareWidgetEvent) => void;
-  onQr?: (event: ShareWidgetEvent) => void;
-  onDownload?: (event: ShareWidgetEvent) => void;
-  onOpen?: (event: ShareWidgetEvent) => void;
-  onClose?: (event: ShareWidgetEvent) => void;
+  onCopy?: (event: ShareHopEvent) => void;
+  onShare?: (event: ShareHopEvent) => void;
+  onQr?: (event: ShareHopEvent) => void;
+  onDownload?: (event: ShareHopEvent) => void;
+  onOpen?: (event: ShareHopEvent) => void;
+  onClose?: (event: ShareHopEvent) => void;
 }
 
 const EVENTS = {
-  onCopy: "sw-copy",
-  onShare: "sw-share",
-  onQr: "sw-qr",
-  onDownload: "sw-download",
-  onOpen: "sw-open",
-  onClose: "sw-close",
+  onCopy: "sh-copy",
+  onShare: "sh-share",
+  onQr: "sh-qr",
+  onDownload: "sh-download",
+  onOpen: "sh-open",
+  onClose: "sh-close",
 } as const;
 
 /**
- * React wrapper for <share-widget>. The custom element is registered on the
+ * React wrapper for <share-hop>. The custom element is registered on the
  * client only, so this is safe in Next.js server components' children and SSR.
  */
-export function ShareWidget(props: ShareWidgetProps) {
-  const ref = useRef<HTMLElement & { labels?: Partial<ShareWidgetLabels>; targets?: ShareTarget[] }>(null);
+export function ShareHop(props: ShareHopProps) {
+  const ref = useRef<HTMLElement & { labels?: Partial<ShareHopLabels>; targets?: ShareTarget[] }>(null);
   const handlers = useRef(props);
   handlers.current = props;
 
@@ -81,7 +81,7 @@ export function ShareWidget(props: ShareWidgetProps) {
     const el = ref.current;
     if (!el) return;
     // The element may not be upgraded yet; customElements.whenDefined covers that.
-    void customElements.whenDefined("share-widget").then(() => {
+    void customElements.whenDefined("share-hop").then(() => {
       el.labels = props.labels ?? {};
     });
   }, [labelsKey]);
@@ -97,7 +97,7 @@ export function ShareWidget(props: ShareWidgetProps) {
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    void customElements.whenDefined("share-widget").then(() => {
+    void customElements.whenDefined("share-hop").then(() => {
       el.targets = targets ?? [];
     });
   }, [targets]);
@@ -107,7 +107,7 @@ export function ShareWidget(props: ShareWidgetProps) {
     if (!el) return;
     const entries = Object.entries(EVENTS) as [keyof typeof EVENTS, string][];
     const listeners = entries.map(([prop, type]) => {
-      const listener = (event: Event) => handlers.current[prop]?.(event as ShareWidgetEvent);
+      const listener = (event: Event) => handlers.current[prop]?.(event as ShareHopEvent);
       el.addEventListener(type, listener);
       return () => el.removeEventListener(type, listener);
     });
@@ -117,7 +117,7 @@ export function ShareWidget(props: ShareWidgetProps) {
   const flag = (value: boolean | undefined) => (value ? "" : undefined);
 
   return createElement(
-    "share-widget",
+    "share-hop",
     {
       ref,
       id: props.id,

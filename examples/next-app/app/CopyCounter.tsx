@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ShareWidget, type ShareTarget } from "share-panel-widget/react";
+import { ShareHop, type ShareTarget } from "sharehop/react";
 
 // A per-widget target (declared outside the component so its identity is stable).
 const TARGETS: ShareTarget[] = [
@@ -13,7 +13,7 @@ export function CopyCounter() {
   const [events, setEvents] = useState<string[]>([]);
   return (
     <div>
-      <ShareWidget
+      <ShareHop
         url="https://example.com/store/jamie"
         shareTitle="Jamie's store"
         heading="Share my store"
