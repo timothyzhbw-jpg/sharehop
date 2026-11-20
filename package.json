@@ -4,16 +4,30 @@
   "description": "A small, framework-free share panel for any website: copy link, QR code, native share and 40+ apps (WhatsApp, WeChat, X, LINE, Weibo…) with a plug-in API for your own — as a Web Component with a thin React wrapper.",
   "license": "MIT",
   "author": "Bowen Zhang",
+  "homepage": "https://github.com/timothyzhbw-jpg/sharehop#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/timothyzhbw-jpg/sharehop.git"
+  },
+  "bugs": {
+    "url": "https://github.com/timothyzhbw-jpg/sharehop/issues"
+  },
   "type": "module",
   "keywords": [
+    "copy-link",
+    "custom-element",
+    "deep-link",
+    "qr-code",
+    "react",
     "share",
     "share-button",
-    "web-share-api",
-    "qr-code",
-    "copy-link",
+    "share-buttons",
+    "share-sheet",
+    "social-share",
     "web-component",
-    "custom-element",
-    "react"
+    "web-share-api",
+    "wechat",
+    "whatsapp"
   ],
   "sideEffects": [
     "./dist/element/define.js",
