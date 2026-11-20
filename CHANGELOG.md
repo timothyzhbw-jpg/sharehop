@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.2.0 — unreleased
+## 0.2.0 — 2026-11-20
 
 - Renamed to **sharehop**: package `sharehop`, element `<share-hop>`, `window.ShareHop` in the script build, React `ShareHop`, `defineShareHop()`, events `sh-*` (were `sw-*`), CSS variables `--sh-*` (were `--sw-*`), script files `dist/sharehop.global.js` / `dist/sharehop.lite.global.js`.
 - 43 built-in app targets (WhatsApp, Telegram, LINE, SMS, X, Facebook, LinkedIn, Reddit, Threads, Bluesky, WeChat, QQ, Weibo, Xiaohongshu, Douyin, Instagram, KakaoTalk, Discord, Google Classroom, Teams, Gmail, Outlook and more), each checked against the service's docs and requested live; sources in docs/TARGETS.md.
@@ -13,7 +13,7 @@
 - `npm run check-targets` maintenance script.
 - Breaking (pre-1.0): `labels.whatsapp` / `labels.email` removed (app names come from targets); `SHARE_TARGETS` and `ShareTargetId` removed (use `listShareTargets()` / `string`); `shareTargetUrl()` returns `string | null`; `ShareEnvironment` gained `ios` / `android`; `copyText()` takes an optional container.
 
-## 0.1.0 — unreleased
+## 0.1.0 — not published
 
 First version.
 

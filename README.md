@@ -2,7 +2,7 @@
 
 **Share to any app in one hop.** A small share panel for any website: **copy link, QR code (with PNG download), the phone's native share sheet, and 40+ apps** — WhatsApp, WeChat, Instagram, LINE, X, Weibo, Xiaohongshu, KakaoTalk, Telegram… — plus **a plug-in API to add your own**. One framework-free Web Component, with a thin React wrapper.
 
-![Share panel with a listing preview, four share actions and a copy-link row](docs/screenshot.png)
+![Share panel with a listing preview, four share actions and a copy-link row](https://raw.githubusercontent.com/timothyzhbw-jpg/sharehop/main/docs/screenshot.png)
 
 - Works on any site: plain HTML, React / Next.js, Vue, Svelte, server-rendered pages.
 - **Jumps straight into apps.** Apps that accept a pre-filled share (WhatsApp, Telegram, X, Weibo…) open with the message ready. Apps that don't (WeChat, Instagram, Xiaohongshu, Douyin…) get the message copied and the app opened, so the user only has to paste. On a computer, WeChat and QQ show a QR code to scan instead.
@@ -14,7 +14,7 @@
 - Themeable with CSS variables, dark mode included; accessible (real buttons and links, focus handling, screen-reader announcements).
 - Fires events for each share so you can count them in your own analytics. No tracking built in.
 
-Every app link was checked against the service's own docs and requested live on 2026-11-18 — see [docs/TARGETS.md](docs/TARGETS.md) for each one's sources, confidence and caveats.
+Every app link was checked against the service's own docs and requested live on 2026-11-18 — see [docs/TARGETS.md](https://github.com/timothyzhbw-jpg/sharehop/blob/main/docs/TARGETS.md) for each one's sources, confidence and caveats.
 
 ## Try the demo
 
@@ -71,11 +71,11 @@ import { ShareHop } from "sharehop/react";
 />;
 ```
 
-`ShareHop` is a client component and registers the element in the browser only, so it can be placed in a server component. Event props (`onCopy`, `onShare`, …) and `targets` need a client component, as usual. See [`examples/next-app`](examples/next-app).
+`ShareHop` is a client component and registers the element in the browser only, so it can be placed in a server component. Event props (`onCopy`, `onShare`, …) and `targets` need a client component, as usual. See [`examples/next-app`](https://github.com/timothyzhbw-jpg/sharehop/tree/main/examples/next-app).
 
 ## Apps
 
-![Two share panels with brand-coloured app tiles: one for international friends (WhatsApp, Instagram, WeChat, LINE, Telegram, X), one in Chinese (WeChat, QQ, Weibo, Qzone, Douban)](docs/apps.png)
+![Two share panels with brand-coloured app tiles: one for international friends (WhatsApp, Instagram, WeChat, LINE, Telegram, X), one in Chinese (WeChat, QQ, Weibo, Qzone, Douban)](https://raw.githubusercontent.com/timothyzhbw-jpg/sharehop/main/docs/apps.png)
 
 List app ids in `actions`, in the order you want them, mixed freely with `copy`, `qr` and `native` (the "More" button):
 
