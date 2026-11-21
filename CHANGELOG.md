@@ -11,6 +11,7 @@
 - Copy-then-open copies synchronously inside the tap, so the copy survives the switch to the app.
 - New `sharehop.lite.global.js` build without brand logos.
 - `npm run check-targets` maintenance script.
+- Installable from GitHub: a prebuilt release tarball, `github:timothyzhbw-jpg/sharehop#v0.2.0` (a `prepare` script builds it), and the script via jsDelivr from the tag.
 - Breaking (pre-1.0): `labels.whatsapp` / `labels.email` removed (app names come from targets); `SHARE_TARGETS` and `ShareTargetId` removed (use `listShareTargets()` / `string`); `shareTargetUrl()` returns `string | null`; `ShareEnvironment` gained `ios` / `android`; `copyText()` takes an optional container.
 
 ## 0.1.0 — not published

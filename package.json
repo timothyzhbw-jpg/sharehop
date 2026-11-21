@@ -66,7 +66,8 @@
     "test": "node --test test/*.test.ts",
     "demo": "node scripts/serve.mjs",
     "check-targets": "node scripts/check-targets.mjs",
-    "icons": "node scripts/gen-brand-icons.mjs"
+    "icons": "node scripts/gen-brand-icons.mjs",
+    "prepare": "npm run build"
   },
   "dependencies": {
     "uqr": "^0.1.3"

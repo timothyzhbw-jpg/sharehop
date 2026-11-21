@@ -31,7 +31,7 @@ The demo uses made-up listings and links only.
 ### Script tag (any website)
 
 ```html
-<script src="https://unpkg.com/sharehop/dist/sharehop.global.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/timothyzhbw-jpg/sharehop@v0.2.0/dist/sharehop.global.js"></script>
 
 <share-hop
   url="https://example.com/marketplace/27-inch-monitor"
@@ -42,13 +42,23 @@ The demo uses made-up listings and links only.
 </share-hop>
 ```
 
-Leave out `url` to share the current page. `sharehop.global.js` is ~35 KB gzipped with all brand logos; `sharehop.lite.global.js` (~19 KB) shows letter icons instead.
+Leave out `url` to share the current page. The script is served by jsDelivr straight from the `v0.2.0` tag on GitHub. `sharehop.global.js` is ~35 KB gzipped with all brand logos; `sharehop.lite.global.js` (~19 KB) shows letter icons instead.
 
 ### npm + bundler
 
+sharehop is not on the npm registry yet. Install it from GitHub — either the prebuilt release (no build step, works with npm, pnpm and yarn):
+
 ```bash
-npm install sharehop
+npm install https://github.com/timothyzhbw-jpg/sharehop/releases/download/v0.2.0/sharehop-0.2.0.tgz
 ```
+
+or straight from the repository (npm builds it during install):
+
+```bash
+npm install github:timothyzhbw-jpg/sharehop#v0.2.0
+```
+
+Once it is published to npm, `npm install sharehop` will work too.
 
 ```js
 import "sharehop/define"; // registers <share-hop>
@@ -296,6 +306,8 @@ Opening apps can't be fully tested without the real devices and apps: detection 
 ## 中文说明
 
 一个可以放进任何网站的分享面板：复制链接、二维码（可下载 PNG）、手机系统分享，以及 40 多个 App——微信、QQ、微博、小红书、抖音、QQ 空间、豆瓣、WhatsApp、Instagram、LINE、X、KakaoTalk……能预填内容的 App 会直接带着文案打开；微信、小红书、抖音、Instagram 这类不能预填的，会先复制文案再打开 App，用户粘贴即可；电脑上点微信或 QQ 会显示二维码让手机扫。在微信内置浏览器里会提示用右上角 ··· 分享。
+
+目前还没上 npm，可以直接从 GitHub 安装：`npm install https://github.com/timothyzhbw-jpg/sharehop/releases/download/v0.2.0/sharehop-0.2.0.tgz`，或者在网页里用 `<script src="https://cdn.jsdelivr.net/gh/timothyzhbw-jpg/sharehop@v0.2.0/dist/sharehop.global.js"></script>`。
 
 用 `actions="copy,qr,@china"` 一次加上中国常用 App；用 `registerShareTarget()` 可以接入任何别的 App（插口），一个 URL 模板就够了。内置中英文（`lang="zh"`），分享文案可以用 `template` 自定义，加上 `utm` 后每个渠道的链接会带上 `utm_source`，方便统计。
 
