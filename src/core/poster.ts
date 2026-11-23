@@ -53,7 +53,7 @@ export async function posterCanvas(options: PosterOptions): Promise<HTMLCanvasEl
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("Canvas 2D context is not available");
 
-  const photo = options.image ? await loadImage(options.image) : null;
+  const [photo] = await Promise.all([options.image ? loadImage(options.image) : null, fontsReady(doc, font)]);
 
   // Story format: a soft tinted backdrop with the card centred on it.
   let x0 = 0;
@@ -85,8 +85,8 @@ export async function posterCanvas(options: PosterOptions): Promise<HTMLCanvasEl
   const innerW = w - pad * 2;
   let y = y0 + pad;
 
-  // QR code: big enough to survive chat apps shrinking the image to ~720 px wide
-  // (≥ 4 px per module), with a 4-module quiet zone.
+  // QR code: large, with a 4-module quiet zone, so it survives chat apps
+  // shrinking and recompressing the image (see drawQr for module sizing).
   const qrSize = format === "story" ? 280 : 300;
   // Photo (cover-cropped, rounded) — or a tinted block when there is none.
   const footerH = qrSize + 40;
@@ -162,24 +162,26 @@ export async function posterBlob(options: PosterOptions): Promise<Blob> {
  * text prefers to break at spaces.
  */
 export function wrapText(measure: (text: string) => number, text: string, width: number, maxLines: number): string[] {
-  const chars = Array.from(text.replace(/\s+/g, " "));
+  const chars = graphemes(text.replace(/\s+/g, " ").trim());
   const lines: string[] = [];
   let line = "";
   for (let i = 0; i < chars.length; i++) {
-    const next = line + chars[i];
+    const ch = chars[i] ?? "";
+    const next = line + ch;
     if (measure(next) <= width || line === "") {
       line = next;
       continue;
     }
-    // Prefer breaking at the last space for Latin text.
+    // Break at the last space for scripts that use spaces (Latin, Cyrillic,
+    // Greek…); Chinese/Japanese break between characters.
     const space = line.lastIndexOf(" ");
     let carry = "";
-    if (space > 0 && /[A-Za-z0-9]/.test(chars[i] ?? "")) {
+    if (space > 0 && WORD_CHAR.test(ch) && !CJK.test(ch)) {
       carry = line.slice(space + 1);
       line = line.slice(0, space);
     }
     lines.push(line.trimEnd());
-    line = (carry + chars[i]).trimStart();
+    line = (carry + ch).trimStart();
     if (lines.length === maxLines) {
       const rest = [line, ...chars.slice(i + 1)].join("");
       if (rest.trim()) lines[maxLines - 1] = ellipsize(measure, lines[maxLines - 1] ?? "", width);
@@ -190,8 +192,18 @@ export function wrapText(measure: (text: string) => number, text: string, width:
   return lines;
 }
 
+const WORD_CHAR = /[\p{L}\p{N}]/u;
+const CJK = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u;
+
+/** User-perceived characters: flags and emoji sequences stay whole. */
+function graphemes(text: string): string[] {
+  const Segmenter = (Intl as { Segmenter?: new (l?: string, o?: { granularity: string }) => { segment(t: string): Iterable<{ segment: string }> } }).Segmenter;
+  if (Segmenter) return Array.from(new Segmenter(undefined, { granularity: "grapheme" }).segment(text), (s) => s.segment);
+  return Array.from(text);
+}
+
 function ellipsize(measure: (text: string) => number, text: string, width: number): string {
-  const chars = Array.from(text);
+  const chars = graphemes(text);
   while (chars.length && measure(chars.join("") + "…") > width) chars.pop();
   return chars.join("").trimEnd() + "…";
 }
@@ -208,9 +220,11 @@ function drawQr(ctx: CanvasRenderingContext2D, text: string, x: number, y: numbe
   const matrix = qrMatrix(text, "M");
   const quiet = 4;
   const total = matrix.length + quiet * 2;
-  // Whole, even pixels per module: edges stay sharp at full size and when an
-  // app halves the image, which keeps the code scannable after compression.
-  const cell = Math.max(2, Math.floor(size / total / 2) * 2);
+  // Whole pixels per module keep edges sharp; prefer even sizes (they stay sharp
+  // when an app halves the image) unless that would make modules too small.
+  const whole = Math.max(1, Math.floor(size / total));
+  const even = whole - (whole % 2);
+  const cell = even >= 6 ? even : whole;
   const offset = Math.floor((size - cell * total) / 2);
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(x, y, size, size);
@@ -241,8 +255,19 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
   ctx.closePath();
 }
 
-/** Load an image for canvas use; resolves null if it fails or would taint the canvas. */
-function loadImage(src: string): Promise<HTMLImageElement | null> {
+/**
+ * Load an image for canvas use; resolves null if it fails or would taint the
+ * canvas. If the page already showed the same URL without CORS (e.g. a preview
+ * <img>), some CDNs serve that cached copy without CORS headers, so a failed
+ * load is retried once with a cache-busting parameter.
+ */
+async function loadImage(src: string): Promise<HTMLImageElement | null> {
+  const first = await loadOnce(src);
+  if (first || !/^https?:\/\//i.test(src)) return first;
+  return loadOnce(`${src}${src.includes("?") ? "&" : "?"}sh-cors=1`);
+}
+
+function loadOnce(src: string): Promise<HTMLImageElement | null> {
   return new Promise((resolve) => {
     const img = new Image();
     img.crossOrigin = "anonymous";
@@ -258,6 +283,14 @@ function loadImage(src: string): Promise<HTMLImageElement | null> {
     };
     img.src = src;
   });
+}
+
+/** Wait (up to ~1.5 s) for the poster's font weights so canvas text doesn't fall back. */
+function fontsReady(doc: Document, font: string): Promise<void> {
+  const fonts = (doc as Document & { fonts?: { load(font: string): Promise<unknown> } }).fonts;
+  if (!fonts) return Promise.resolve();
+  const loads = ["400 32px", "700 52px", "800 64px"].map((w) => fonts.load(`${w} ${font}`).catch(() => undefined));
+  return Promise.race([Promise.all(loads).then(() => undefined), new Promise<void>((r) => setTimeout(r, 1500))]);
 }
 
 /** Mix a hex colour with white; non-hex colours fall back to a light grey. */

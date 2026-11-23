@@ -45,12 +45,14 @@ export interface ShareHopLabels {
   /** Printed on the poster under the brand name. */
   posterCaption: string;
   posterHintWeChat: string;
+  posterHintHold: string;
   /** WeChat on a computer: scanning then sharing from ··· sends a card. */
   wechatScan: string;
   wechatScanCopied: string;
   posterSize: string;
   posterCard: string;
   posterStory: string;
+  posterSquare: string;
 }
 
 export type ShareHopLang = "en" | "zh";
@@ -94,11 +96,13 @@ export const LABELS: Record<ShareHopLang, ShareHopLabels> = {
     posterSave: "Save image",
     posterCaption: "Scan the QR code to view",
     posterHintWeChat: "Press and hold the image to send it to a chat, save it, or scan the QR code.",
+    posterHintHold: "Press and hold the image to save it, then send it anywhere.",
     wechatScan: "Scan the QR code with WeChat to open the page there, then tap ··· and choose Send to Chat — it arrives as a card.",
     wechatScanCopied: "Link copied. To send a card instead, scan the QR code with WeChat, then tap ··· and choose Send to Chat.",
     posterSize: "Image size",
     posterCard: "Chats & posts 4:5",
     posterStory: "Stories 9:16",
+    posterSquare: "Square 1:1",
   },
   zh: {
     share: "分享",
@@ -138,11 +142,13 @@ export const LABELS: Record<ShareHopLang, ShareHopLabels> = {
     posterSave: "保存图片",
     posterCaption: "长按识别二维码查看",
     posterHintWeChat: "长按图片可以发送给朋友、保存，或识别二维码。",
+    posterHintHold: "长按图片保存，再发到任何地方。",
     wechatScan: "用微信扫码打开，再点右上角 ··· 发送给朋友，发出去就是卡片。",
     wechatScanCopied: "链接已复制。想发成卡片：用微信扫码打开，再点右上角 ··· 发送给朋友。",
     posterSize: "图片尺寸",
     posterCard: "聊天/帖子 4:5",
     posterStory: "快拍 9:16",
+    posterSquare: "方形 1:1",
   },
 };
 

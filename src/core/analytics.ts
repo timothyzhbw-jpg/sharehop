@@ -27,11 +27,15 @@ const TYPES: readonly ShareActivityType[] = ["copy", "share", "qr", "download", 
  * Call `handler` for every share event from any sharehop widget under `root`
  * (default: the whole document). Returns a function that stops listening.
  *
- *   onShareActivity((e) => gtag("event", "share", { method: e.channel, item_id: e.url }));
+ *   onShareActivity((e) => gtag("event", "share", { method: e.channel, item_id: e.url }), { sharesOnly: true });
+ *
+ * By default it also reports opening/closing the dialog and the QR/poster
+ * panels; `sharesOnly: true` keeps just copies, app and native shares, QR
+ * downloads and share-image shares/saves.
  */
 export function onShareActivity(
   handler: (activity: ShareActivity) => void,
-  options: { root?: EventTarget } = {},
+  options: { root?: EventTarget; sharesOnly?: boolean } = {},
 ): () => void {
   const root = options.root ?? (globalThis.document as Document | undefined);
   if (!root) return () => {};
@@ -39,14 +43,16 @@ export function onShareActivity(
     const listener = (event: Event) => {
       const detail = ((event as CustomEvent).detail ?? {}) as Record<string, unknown>;
       const el = event.target as Element | null;
+      const channel = String(detail.method ?? type);
+      if (options.sharesOnly && !isShare(type, channel)) return;
       try {
         handler({
           type,
-          channel: String(detail.method ?? type),
+          channel,
           url: String(detail.url ?? ""),
           ok: typeof detail.ok === "boolean" ? detail.ok : undefined,
           result: typeof detail.result === "string" ? detail.result : undefined,
-          title: el?.getAttribute?.("share-title") ?? undefined,
+          title: typeof detail.title === "string" ? detail.title : (el?.getAttribute?.("share-title") ?? undefined),
           widgetId: el?.id || undefined,
           timestamp: Date.now(),
         });
@@ -58,6 +64,11 @@ export function onShareActivity(
     return () => root.removeEventListener(`sh-${type}`, listener);
   });
   return () => listeners.forEach((off) => off());
+}
+
+function isShare(type: ShareActivityType, channel: string): boolean {
+  if (type === "copy" || type === "share" || type === "download") return true;
+  return type === "poster" && (channel === "poster-share" || channel === "poster-save");
 }
 
 /**

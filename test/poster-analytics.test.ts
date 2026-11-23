@@ -96,3 +96,40 @@ describe("readPageMeta", () => {
     assert.deepEqual(readPageMeta(undefined), {});
   });
 });
+
+describe("review fixes (0.3)", () => {
+  test("Cyrillic and accented words break at spaces, not mid-word", () => {
+    assert.deepEqual(wrapText(measure, "Новые брюки Essentials размер", 100, 4), ["Новые", "брюки", "Essentials", "размер"]);
+    assert.deepEqual(wrapText(measure, "Новые брюки Essentials размер", 100, 3), ["Новые", "брюки", "Essential…"]);
+    assert.deepEqual(wrapText(measure, "Très élégant", 70, 2), ["Très", "élégant"]);
+  });
+
+  test("flags and emoji sequences are never split", () => {
+    const flag = "🇺🇸";
+    for (const width of [40, 80, 90, 100, 120]) {
+      const lines = wrapText((t) => [...new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(t)].length * 10, `Made in ${flag} USA ${flag}${flag}`, width, 1);
+      const out = lines.join("");
+      const regional = [...out].filter((c) => /\p{Regional_Indicator}/u.test(c)).length;
+      assert.equal(regional % 2, 0, `${width}: half a flag in "${out}"`);
+    }
+  });
+
+  test("sharesOnly drops dialog and panel toggles", () => {
+    const root = new EventTarget();
+    const seen: string[] = [];
+    onShareActivity((e) => seen.push(`${e.type}:${e.channel}`), { root, sharesOnly: true });
+    for (const [type, method] of [
+      ["sh-open", "dialog"], ["sh-close", "dialog"], ["sh-qr", "qr"], ["sh-poster", "poster"],
+      ["sh-copy", "copy-link"], ["sh-share", "wechat"], ["sh-poster", "poster-share"], ["sh-poster", "poster-save"], ["sh-download", "png"],
+    ]) root.dispatchEvent(new CustomEvent(type!, { detail: { method, url: "u" } }));
+    assert.deepEqual(seen, ["copy:copy-link", "share:wechat", "poster:poster-share", "poster:poster-save", "download:png"]);
+  });
+
+  test("the event's title wins over the attribute (page-meta titles)", () => {
+    const root = new EventTarget();
+    let title: string | undefined;
+    onShareActivity((e) => (title = e.title), { root });
+    root.dispatchEvent(new CustomEvent("sh-share", { detail: { method: "x", url: "u", title: "From og:title" } }));
+    assert.equal(title, "From og:title");
+  });
+});

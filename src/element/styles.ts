@@ -54,8 +54,8 @@ svg { display: block; flex: none; }
   box-shadow: var(--sh-card-shadow, none);
 }
 /* appearance="plain": no card chrome, for placing the widget inside your own card or sheet. */
-:host([appearance="plain"]) .card { background: transparent; border: 0; padding: 0; box-shadow: none; border-radius: 0; }
-:host([appearance="plain"]) dialog .card { background: var(--_bg); padding: var(--sh-card-padding, 24px); border-radius: var(--sh-radius, 24px); }
+/* Only the inline panel's card: a dialog keeps its card (and phone bottom-sheet styling). */
+:host([appearance="plain"]) > .card { background: transparent; border: 0; padding: 0; box-shadow: none; border-radius: 0; }
 
 .preview { display: flex; gap: 20px; align-items: center; }
 .preview img {
@@ -137,6 +137,7 @@ svg { display: block; flex: none; }
 .poster-img { width: 100%; height: 100%; object-fit: contain; display: block; -webkit-touch-callout: default; }
 .poster-loading { margin: 0; color: #6b6b6b; font-size: 14px; }
 .poster-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.poster-actions .pill:disabled { opacity: .5; cursor: progress; filter: none; }
 
 .url-row {
   display: flex; align-items: center; gap: 12px;

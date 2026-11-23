@@ -217,11 +217,11 @@ Add `poster` to `actions` for a **share image**: one picture with the item's pho
 
 It is made for apps that don't turn pasted links into cards — WeChat chats and Instagram Stories in particular:
 
-- On phones, **Share image** sends it through the system share sheet (WeChat, Instagram, Messages…); **Save image** downloads it; the image can also be pressed and held to save.
-- Inside WeChat's browser it is shown as a real image, so press-and-hold offers "send to friend", "save" and "scan QR code".
+- On phones, **Share image** sends it through the system share sheet (WeChat, Instagram, Messages…). It appears only where the browser can share files — not in Android WebViews, so not inside WeChat or Instagram on Android. **Save image** downloads it; the image can also be pressed and held to save.
+- Inside WeChat's browser it is shown as a real image, so press-and-hold offers "send to friend", "save" and "scan QR code". In in-app browsers, where downloads don't work, Save image is hidden and the hint says to press and hold.
 - Users can switch between **4:5** (chats and posts) and **9:16** (Stories) in the panel.
-- The QR code is drawn with whole-pixel modules and a 4-module quiet zone; it still scans after the image is shrunk to ~360 px wide and recompressed as JPEG. Pass `qr-url` with a short link on your own domain for an even sturdier code — never a third-party shortener (WeChat treats redirect chains as evasion).
-- The photo needs CORS (`Access-Control-Allow-Origin`), e.g. public Supabase or S3 buckets; without it the image is drawn without the photo. Colour comes from `--sh-poster-accent` (else `--sh-accent`), the font from `--sh-poster-font` (it must already be loaded).
+- The QR code is large, drawn with whole-pixel modules and a 4-module quiet zone. In our tests a ~110-character link still scanned after the image was shrunk to 360 px wide and recompressed as JPEG; longer links make finer modules. Pass `qr-url` with a short link on your own domain for a sturdier code — never a third-party shortener (WeChat treats redirect chains as evasion). `qr-url` is encoded as given, without UTM tags.
+- The photo needs CORS (`Access-Control-Allow-Origin`), e.g. public Supabase or S3 buckets; without it the image is drawn without the photo. The price and brand use `--sh-poster-accent`; without it, `--sh-accent` if it is dark enough to read on white, else near-black. Text uses `--sh-poster-font` (the widget waits briefly for it to load).
 
 Without the widget: `posterBlob({ url, title, subtitle, meta, image, brand, format })` returns the PNG.
 
@@ -240,18 +240,18 @@ Without the widget: `posterBlob({ url, title, subtitle, meta, image, brand, form
 
 ## Analytics
 
-`onShareActivity()` hears every share from every widget on the page, in one shape (`type`, `channel`, `url`, `ok`, `result`, `title`, `widgetId`, `timestamp`):
+`onShareActivity()` hears every share from every widget on the page, in one shape (`type`, `channel`, `url`, `ok`, `result`, `title`, `widgetId`, `timestamp`). With `{ sharesOnly: true }` it skips opening and closing the dialog and the QR / share-image panels:
 
 ```js
 import { onShareActivity } from "sharehop"; // window.ShareHop.onShareActivity with the script tag
 
 // GA4's recommended "share" event
-onShareActivity((e) => gtag("event", "share", { method: e.channel, content_type: "listing", item_id: e.url }));
+onShareActivity((e) => gtag("event", "share", { method: e.channel, content_type: "listing", item_id: e.url }), { sharesOnly: true });
 
 // PostHog
-onShareActivity((e) => posthog.capture("share", e));
+onShareActivity((e) => posthog.capture("share", e), { sharesOnly: true });
 
-// Your own endpoint (survives page unloads)
+// Your own endpoint (survives page unloads) — everything, including panel opens
 onShareActivity((e) => navigator.sendBeacon("/api/share-events", JSON.stringify(e)));
 ```
 
@@ -276,9 +276,9 @@ These are **taps**, not completed shares: browsers and apps (WeChat since 2018) 
 | `image`, `preview-title`, `preview-subtitle`, `preview-meta` | `image`, `previewTitle`, … | — | Optional preview card above the panel (image, title, a bold line such as a price, a muted line). `image` (if it is an absolute http(s) URL) is also sent to Pinterest, Weibo, Qzone and others. |
 | `page-meta` | `pageMeta` | off | Fill missing `share-title`, `share-text`, `image` and the preview from the page's own Open Graph tags. |
 | `appearance` | `appearance` | `card` | `plain` drops the card's border, padding and background, to sit inside your own card or sheet. |
-| `brand-name` | `brandName` | `og:site_name`, else the host | Name printed on the share image. |
+| `brand-name` | `brandName` | the page's `og:site_name`, else the host | Name printed on the share image. |
 | `poster-format` | `posterFormat` | `card` | Share image size: `card` 1080×1350 (4:5), `story` 1080×1920 (9:16), `square`. Users can switch in the panel. |
-| `qr-url` | `qrUrl` | the share link | What the QR codes encode. A short link on your own domain (e.g. `https://example.com/m/abc`) scans more easily. |
+| `qr-url` | `qrUrl` | the share link | What the QR codes encode, as given (no UTM tags). A short link on your own domain (e.g. `https://example.com/m/abc`) scans more easily. |
 
 For a fully custom preview, put your own markup in the `preview` slot (in React: pass `children`):
 
@@ -296,7 +296,7 @@ Override any built-in text with the `labels` property:
 document.querySelector("share-hop").labels = { copyLink: "Copy store link", qr: "Scan" };
 ```
 
-Keys: `share, heading, copyLink, qr, more, copy, copied, linkCopied, copyFailed, shareFailed, openLink, close, scanHint, download, qrAlt, wechatHint, gotIt, noUrl, copiedOpening, opening, appNotOpened, appNotOpenedCopied, copiedPaste, copiedScan, scanWith, menuHint, wechatHintPoster, wechatScan, wechatScanCopied, poster, posterAlt, posterLoading, posterFailed, posterHint, posterHintMobile, posterHintWeChat, posterShare, posterSave, posterCaption, posterSize, posterCard, posterStory` (`{app}` is replaced by the app's name).
+Keys: `share, heading, copyLink, qr, more, copy, copied, linkCopied, copyFailed, shareFailed, openLink, close, scanHint, download, qrAlt, wechatHint, gotIt, noUrl, copiedOpening, opening, appNotOpened, appNotOpenedCopied, copiedPaste, copiedScan, scanWith, menuHint, wechatHintPoster, wechatScan, wechatScanCopied, poster, posterAlt, posterLoading, posterFailed, posterHint, posterHintMobile, posterHintHold, posterHintWeChat, posterShare, posterSave, posterCaption, posterSize, posterCard, posterStory, posterSquare` (`{app}` is replaced by the app's name).
 
 ### Methods
 
@@ -338,7 +338,7 @@ To avoid a flash before the script loads, you can reserve space: `share-hop:not(
 
 ## Events
 
-Every event bubbles out of the element with `detail.method` and `detail.url` (the link that was actually shared, including UTM tags):
+Every event bubbles out of the element with `detail.method`, `detail.url` (the link that was actually shared, including UTM tags; for QR and share-image events, what the QR encodes) and `detail.title`:
 
 | Event | When | Extra detail |
 | --- | --- | --- |
@@ -346,7 +346,7 @@ Every event bubbles out of the element with `detail.method` and `detail.url` (th
 | `sh-share` | An app or the native share was used | `method`: the app id, `native` or `wechat-hint`. `result` for native: `shared`, `cancelled`, `failed`, `unsupported`; for app launches: `opened`, `not-opened`, `unknown`, `blocked`, `copied`, `qr`, `menu-hint`. `ok` where known |
 | `sh-qr` | QR panel opened or closed | `open` |
 | `sh-download` | QR PNG downloaded | `ok` |
-| `sh-poster` | Share image opened, shared or saved | `method`: `poster`, `poster-share`, `poster-save`; `open`, `ok`, `result` |
+| `sh-poster` | Share image opened, shared or saved | `method`: `poster`, `poster-share`, `poster-save`; `open`, `ok`, `result` (`shared`, `cancelled`, `failed`; `requested` for saves — the browser doesn't confirm downloads) |
 | `sh-open` / `sh-close` | Dialog opened / closed (or panel closed with ×) | `sh-close` from × is cancelable |
 
 ```js
