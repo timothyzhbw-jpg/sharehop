@@ -91,6 +91,8 @@ export class ShareHopElement extends Base {
   /** Element that opened the full-screen hint, to refocus when it closes. */
   #hintOpener: HTMLElement | null = null;
   #posterOpen = false;
+  /** Chosen in the poster panel; starts from the poster-format attribute. */
+  #posterFormat: PosterFormat | null = null;
   /** Last generated poster, keyed by its inputs so re-renders don't redraw it. */
   #poster: { key: string; blob: Blob; url: string } | null = null;
 
@@ -414,7 +416,11 @@ export class ShareHopElement extends Base {
         <button type="button" class="pill outline" part="download" data-action="download">${icons.download}<span>${esc(L.download)}</span></button>
       </div>
       <div class="poster" part="poster" id="${this.#id}-poster" ${this.#posterOpen ? "" : "hidden"}>
-        <div class="poster-frame"><img class="poster-img" part="poster-image" alt="${esc(L.posterAlt)}" hidden><p class="poster-loading">${esc(L.posterLoading)}</p></div>
+        <div class="poster-formats" role="group" aria-label="${esc(L.posterSize)}">
+          <button type="button" class="chip" data-action="poster-format" data-format="card" aria-pressed="${this.#currentPosterFormat() !== "story"}">${esc(L.posterCard)}</button>
+          <button type="button" class="chip" data-action="poster-format" data-format="story" aria-pressed="${this.#currentPosterFormat() === "story"}">${esc(L.posterStory)}</button>
+        </div>
+        <div class="poster-frame" data-format="${this.#currentPosterFormat()}"><img class="poster-img" part="poster-image" alt="${esc(L.posterAlt)}" hidden><p class="poster-loading">${esc(L.posterLoading)}</p></div>
         <p class="qr-hint">${esc((this.#env ?? detectEnv()).mobile ? L.posterHintMobile : L.posterHint)}</p>
         <div class="poster-actions">
           <button type="button" class="pill" part="poster-share" data-action="poster-share" hidden>${icons.share}<span>${esc(L.posterShare)}</span></button>
@@ -503,6 +509,14 @@ export class ShareHopElement extends Base {
       case "poster-share":
         void this.#sharePoster(data);
         break;
+      case "poster-format":
+        this.#posterFormat = el.dataset.format === "story" ? "story" : "card";
+        this.#root.querySelectorAll<HTMLElement>('[data-action="poster-format"]').forEach((chip) =>
+          chip.setAttribute("aria-pressed", String(chip.dataset.format === this.#posterFormat)),
+        );
+        this.#root.querySelector<HTMLElement>(".poster-frame")?.setAttribute("data-format", this.#posterFormat);
+        void this.#fillPoster(data);
+        break;
       case "poster-save":
         void this.#savePoster(data);
         break;
@@ -575,10 +589,15 @@ export class ShareHopElement extends Base {
     this.#emit("sh-poster", { method: "poster", url: this.#urlFor("poster", data.url), open: this.#posterOpen });
   }
 
+  #currentPosterFormat(): PosterFormat {
+    if (this.#posterFormat) return this.#posterFormat;
+    const attr = this.getAttribute("poster-format");
+    return attr === "story" || attr === "square" ? attr : "card";
+  }
+
   /** What goes on the poster: the preview fields, falling back to the share fields. */
   #posterOptions(data: ShareData) {
     const L = this.#strings();
-    const format = this.getAttribute("poster-format");
     const accent = getComputedStyle(this).getPropertyValue("--sh-poster-accent").trim() ||
       getComputedStyle(this).getPropertyValue("--sh-accent").trim() || "#111111";
     return {
@@ -590,7 +609,7 @@ export class ShareHopElement extends Base {
       brand: this.#attr("brand-name", "siteName") ?? globalThis.location?.hostname?.replace(/^www\./, ""),
       caption: L.posterCaption,
       accent: safeColor(accent) ? accent : "#111111",
-      format: (format === "story" || format === "square" ? format : "card") as PosterFormat,
+      format: this.#currentPosterFormat(),
       font: getComputedStyle(this).getPropertyValue("--sh-poster-font").trim() || undefined,
     };
   }
@@ -603,6 +622,11 @@ export class ShareHopElement extends Base {
     const loading = this.#root.querySelector<HTMLElement>(".poster-loading");
     const shareButton = this.#root.querySelector<HTMLElement>('[data-action="poster-share"]');
     if (!this.#poster || this.#poster.key !== key) {
+      if (img) img.hidden = true;
+      if (loading) {
+        loading.hidden = false;
+        loading.textContent = this.#strings().posterLoading;
+      }
       try {
         const blob = await posterBlob(options);
         if (this.#poster) URL.revokeObjectURL(this.#poster.url);
@@ -619,9 +643,11 @@ export class ShareHopElement extends Base {
     }
     const currentLoading = this.#root.querySelector<HTMLElement>(".poster-loading") ?? loading;
     if (currentLoading) currentLoading.hidden = true;
-    // Show "Share image" only where the share sheet accepts image files.
+    // "Share image" only on phones whose share sheet accepts image files: desktop
+    // browsers accept files too, but WeChat and Instagram aren't targets there.
     const file = this.#posterFile(data);
-    const canShareFile = !!file && typeof navigator.canShare === "function" && navigator.canShare({ files: [file] });
+    const canShareFile =
+      !!file && (this.#env ?? detectEnv()).mobile && typeof navigator.canShare === "function" && navigator.canShare({ files: [file] });
     const btn = this.#root.querySelector<HTMLElement>('[data-action="poster-share"]') ?? shareButton;
     if (btn) btn.hidden = !canShareFile;
     return this.#poster.blob;

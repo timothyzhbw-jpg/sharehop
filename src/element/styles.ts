@@ -126,8 +126,14 @@ svg { display: block; flex: none; }
   display: grid; place-items: center; width: min(260px, 100%); aspect-ratio: 4 / 5;
   border-radius: 12px; overflow: hidden; background: #fff; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.12);
 }
-:host([poster-format="story"]) .poster-frame { aspect-ratio: 9 / 16; width: min(220px, 100%); }
-:host([poster-format="square"]) .poster-frame { aspect-ratio: 1; }
+.poster-frame[data-format="story"] { aspect-ratio: 9 / 16; width: min(200px, 100%); }
+.poster-frame[data-format="square"] { aspect-ratio: 1; }
+.poster-formats { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+.chip {
+  min-height: 32px; padding: 0 12px; border-radius: 999px; font-size: 13px;
+  border: 1px solid var(--_border); background: var(--_bg); color: var(--_muted);
+}
+.chip[aria-pressed="true"] { background: var(--_fg); color: var(--_bg); border-color: var(--_fg); }
 .poster-img { width: 100%; height: 100%; object-fit: contain; display: block; -webkit-touch-callout: default; }
 .poster-loading { margin: 0; color: #6b6b6b; font-size: 14px; }
 .poster-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }

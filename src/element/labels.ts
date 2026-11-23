@@ -42,6 +42,9 @@ export interface ShareHopLabels {
   posterSave: string;
   /** Printed on the poster under the brand name. */
   posterCaption: string;
+  posterSize: string;
+  posterCard: string;
+  posterStory: string;
 }
 
 export type ShareHopLang = "en" | "zh";
@@ -83,6 +86,9 @@ export const LABELS: Record<ShareHopLang, ShareHopLabels> = {
     posterShare: "Share image",
     posterSave: "Save image",
     posterCaption: "Scan the QR code to view",
+    posterSize: "Image size",
+    posterCard: "Chats & posts 4:5",
+    posterStory: "Stories 9:16",
   },
   zh: {
     share: "分享",
@@ -120,6 +126,9 @@ export const LABELS: Record<ShareHopLang, ShareHopLabels> = {
     posterShare: "分享图片",
     posterSave: "保存图片",
     posterCaption: "长按识别二维码查看",
+    posterSize: "图片尺寸",
+    posterCard: "聊天/帖子 4:5",
+    posterStory: "快拍 9:16",
   },
 };
 
