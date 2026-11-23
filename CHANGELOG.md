@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.3.0 — unreleased
+## 0.3.0 — 2026-11-22
 
 - **Share image** (`poster` action): one picture with the item's photo, title, price, brand and a QR code, in 4:5, 9:16 (Stories) or square. Share image (system share sheet with the file) on phones, Save image, press-and-hold inside WeChat. QR codes are sized and drawn to survive chat-app recompression; `qr-url` lets them encode a short link.
 - **Fit into the host site:** `slot="trigger"` (React `trigger`) for your own button, `appearance="plain"`, and CSS variables for the card, buttons, trigger, icon tiles, heading, labels, dialog and share image.
@@ -8,7 +8,6 @@
 - **Analytics:** `onShareActivity()` (with `sharesOnly`) and `readPageMeta()`; events now carry `title`; new `sh-poster` event (React `onPoster`).
 - **WeChat:** on computers the WeChat button says to scan and share from ··· (that path sends a card); inside WeChat the hint mentions the share image. README documents what WeChat and Instagram can and can't do with links.
 - Breaking (pre-1.0): `poster` is a reserved target id; `ShareHopLabels` has new keys (only matters if you build a complete labels object yourself — `labels` overrides are partial).
-
 
 ## 0.2.0 — 2026-11-20
 

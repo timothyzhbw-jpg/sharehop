@@ -1,6 +1,6 @@
 {
   "name": "sharehop",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "A small, framework-free share panel for any website: copy link, QR code, native share and 40+ apps (WhatsApp, WeChat, X, LINE, Weibo…) with a plug-in API for your own — as a Web Component with a thin React wrapper.",
   "license": "MIT",
   "author": "Bowen Zhang",
