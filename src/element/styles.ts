@@ -48,10 +48,14 @@ svg { display: block; flex: none; }
 
 .card {
   background: var(--_bg);
-  border: 1px solid var(--_border);
+  border: var(--sh-card-border, 1px solid var(--_border));
   border-radius: var(--sh-radius, 24px);
-  padding: 24px;
+  padding: var(--sh-card-padding, 24px);
+  box-shadow: var(--sh-card-shadow, none);
 }
+/* appearance="plain": no card chrome, for placing the widget inside your own card or sheet. */
+:host([appearance="plain"]) .card { background: transparent; border: 0; padding: 0; box-shadow: none; border-radius: 0; }
+:host([appearance="plain"]) dialog .card { background: var(--_bg); padding: var(--sh-card-padding, 24px); border-radius: var(--sh-radius, 24px); }
 
 .preview { display: flex; gap: 20px; align-items: center; }
 .preview img {
@@ -62,11 +66,14 @@ svg { display: block; flex: none; }
 .preview p { margin: 0; }
 .p-title { font-size: 20px; font-weight: 500; }
 .p-subtitle { font-size: 20px; font-weight: 700; margin-top: 6px !important; }
-.p-meta { color: var(--_muted); margin-top: 6px !important; }
+.p-meta {
+  color: var(--_muted); margin-top: 6px !important;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: var(--sh-preview-lines, 2); overflow: hidden;
+}
 .divider { border: 0; border-top: 1px solid var(--_border); margin: 20px 0; }
 
 .header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.heading { margin: 0; font-size: 20px; font-weight: 600; line-height: 1.3; }
+.heading { margin: 0; font-size: var(--sh-heading-size, 20px); font-weight: var(--sh-heading-weight, 600); line-height: 1.3; }
 .close {
   display: grid; place-items: center; width: 44px; height: 44px; margin: -10px -10px -10px 0;
   border-radius: 999px; color: var(--_fg);
@@ -92,12 +99,13 @@ svg { display: block; flex: none; }
 .action .icon svg { width: 28px; height: 28px; }
 .tiles .action { gap: 8px; }
 .tiles .icon {
-  display: grid; place-items: center; width: 48px; height: 48px; border-radius: 14px;
+  display: grid; place-items: center; width: var(--sh-tile-size, 48px); height: var(--sh-tile-size, 48px);
+  border-radius: var(--sh-tile-radius, 14px);
   background: var(--sh-tile, var(--_tile)); color: var(--sh-on-tile, var(--_fg));
 }
 .tiles .icon svg { width: 26px; height: 26px; }
 .tiles .action.is-done .icon { color: var(--_success); }
-.action .label { font-size: 14px; line-height: 1.2; }
+.action .label { font-size: var(--sh-label-size, 14px); line-height: 1.2; }
 .action.is-done, .pill.is-done { color: var(--_success); }
 
 .qr {
@@ -109,6 +117,20 @@ svg { display: block; flex: none; }
 }
 .qr-code svg { width: 100%; height: 100%; }
 .qr-hint { margin: 0; color: var(--_muted); font-size: 14px; text-align: center; }
+
+.poster {
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+  padding: 16px; margin-bottom: 8px; border-radius: 16px; background: var(--_hover);
+}
+.poster-frame {
+  display: grid; place-items: center; width: min(260px, 100%); aspect-ratio: 4 / 5;
+  border-radius: 12px; overflow: hidden; background: #fff; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.12);
+}
+:host([poster-format="story"]) .poster-frame { aspect-ratio: 9 / 16; width: min(220px, 100%); }
+:host([poster-format="square"]) .poster-frame { aspect-ratio: 1; }
+.poster-img { width: 100%; height: 100%; object-fit: contain; display: block; -webkit-touch-callout: default; }
+.poster-loading { margin: 0; color: #6b6b6b; font-size: 14px; }
+.poster-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
 
 .url-row {
   display: flex; align-items: center; gap: 12px;
@@ -126,9 +148,10 @@ svg { display: block; flex: none; }
 
 .pill {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-  min-height: 44px; min-width: 88px; padding: 0 22px; border-radius: 999px;
+  min-height: var(--sh-button-height, 44px); min-width: 88px; padding: 0 22px;
+  border-radius: var(--sh-button-radius, 999px);
   background: var(--_accent); color: var(--_on-accent);
-  font-weight: 600; font-size: 16px; white-space: nowrap;
+  font-weight: var(--sh-button-weight, 600); font-size: var(--sh-button-font-size, 16px); white-space: nowrap;
 }
 .pill:hover { filter: brightness(1.15); }
 .pill.is-done { background: var(--_accent); color: var(--_on-accent); }
@@ -147,17 +170,19 @@ svg { display: block; flex: none; }
 
 /* button mode */
 .trigger {
-  display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 18px;
-  border: 1px solid var(--_border); border-radius: 999px; background: var(--_bg); color: var(--_fg); font-weight: 600;
+  display: inline-flex; align-items: center; gap: 8px; min-height: var(--sh-button-height, 44px); padding: 0 18px;
+  border: var(--sh-trigger-border, 1px solid var(--_border)); border-radius: var(--sh-button-radius, 999px);
+  background: var(--sh-trigger-bg, var(--_bg)); color: var(--sh-trigger-fg, var(--_fg));
+  font-weight: var(--sh-button-weight, 600); font-size: var(--sh-trigger-font-size, inherit);
 }
-.trigger:hover { background: var(--_hover); }
+.trigger:hover { background: var(--sh-trigger-hover, var(--_hover)); }
 .trigger svg { width: 20px; height: 20px; }
 dialog {
   padding: 0; border: 0; background: transparent; color: inherit;
   width: min(560px, calc(100vw - 32px)); max-width: none; max-height: calc(100dvh - 32px); overflow: auto;
 }
-dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
-dialog .card { box-shadow: 0 24px 64px rgba(0, 0, 0, 0.25); }
+dialog::backdrop { background: var(--sh-backdrop, rgba(0, 0, 0, 0.45)); }
+dialog .card { box-shadow: var(--sh-dialog-shadow, 0 24px 64px rgba(0, 0, 0, 0.25)); }
 
 /* WeChat / ··· menu hint: a modal <dialog>, so it is in the top layer above everything. */
 dialog.wx-hint {

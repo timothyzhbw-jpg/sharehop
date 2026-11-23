@@ -20,16 +20,18 @@ import {
 import { launchApp } from "../core/launch.ts";
 import { detectEnv, type ShareEnvironment } from "../core/env.ts";
 import { qrPngBlob, qrSvg } from "../core/qr.ts";
+import { posterBlob, type PosterFormat } from "../core/poster.ts";
+import { readPageMeta } from "../core/analytics.ts";
 import { LABELS, resolveLang, type ShareHopLabels } from "./labels.ts";
 import { icons, monogram } from "./icons.ts";
 import { brandIcon } from "./brand-icons.ts";
 import { styles } from "./styles.ts";
 
 /** Built-in buttons, plus any registered share-target id ("telegram", "x", "wechat", …). */
-export type ShareAction = "copy" | "qr" | "native" | (string & {});
+export type ShareAction = "copy" | "qr" | "native" | "poster" | (string & {});
 export const DEFAULT_ACTIONS: readonly ShareAction[] = ["copy", "qr", "whatsapp", "native"];
 
-/** detail of the sh-copy / sh-share / sh-qr / sh-download / sh-open / sh-close events. */
+/** detail of the sh-copy / sh-share / sh-qr / sh-download / sh-poster / sh-open / sh-close events. */
 export interface ShareHopEventDetail {
   /** What was used: "copy-link", "copy-button", "native", "wechat-hint", or a target id such as "telegram". */
   method: string;
@@ -42,7 +44,7 @@ export interface ShareHopEventDetail {
 }
 
 type Item =
-  | { kind: "builtin"; id: "copy" | "qr" | "native" }
+  | { kind: "builtin"; id: "copy" | "qr" | "native" | "poster" }
   | { kind: "target"; id: string; target: ShareTarget };
 
 // Lets the module be imported during server rendering, where HTMLElement does not exist.
@@ -67,6 +69,10 @@ export class ShareHopElement extends Base {
     "preview-title",
     "preview-subtitle",
     "preview-meta",
+    "page-meta",
+    "appearance",
+    "brand-name",
+    "poster-format",
   ];
 
   #root: ShadowRoot;
@@ -84,11 +90,19 @@ export class ShareHopElement extends Base {
   #rerendering = false;
   /** Element that opened the full-screen hint, to refocus when it closes. */
   #hintOpener: HTMLElement | null = null;
+  #posterOpen = false;
+  /** Last generated poster, keyed by its inputs so re-renders don't redraw it. */
+  #poster: { key: string; blob: Blob; url: string } | null = null;
 
   constructor() {
     super();
     this.#root = this.attachShadow({ mode: "open" });
     this.#root.addEventListener("click", (event) => this.#onClick(event as MouseEvent));
+    // Your own trigger button: <button slot="trigger"> inside <share-hop mode="button">.
+    this.addEventListener("click", (event) => {
+      const trigger = this.querySelector(':scope > [slot="trigger"]');
+      if (trigger && event.composedPath().includes(trigger)) this.open();
+    });
   }
 
   /** Override any built-in text, e.g. `el.labels = { heading: "Share this listing" }`. */
@@ -150,6 +164,20 @@ export class ShareHopElement extends Base {
     this.#unsubscribe = null;
     for (const timer of this.#timers.values()) clearTimeout(timer);
     this.#timers.clear();
+    if (this.#poster) URL.revokeObjectURL(this.#poster.url);
+    this.#poster = null;
+  }
+
+  /** The trigger to return focus to: your slotted button, or the built-in one. */
+  #triggerElement(): HTMLElement | null {
+    const slotted = this.querySelector<HTMLElement>(':scope > [slot="trigger"]');
+    if (slotted) {
+      const focusable = slotted.matches("button, a[href], [tabindex]")
+        ? slotted
+        : slotted.querySelector<HTMLElement>("button, a[href], [tabindex]");
+      return focusable ?? slotted;
+    }
+    return this.#root.querySelector<HTMLElement>(".trigger");
   }
 
   /** Re-render once after a burst of registry changes. */
@@ -182,9 +210,20 @@ export class ShareHopElement extends Base {
     if (!url) return null;
     return {
       url,
-      title: this.getAttribute("share-title") ?? undefined,
-      text: this.getAttribute("share-text") ?? undefined,
+      title: this.#attr("share-title", "title"),
+      text: this.#attr("share-text", "text"),
     };
+  }
+
+  /**
+   * An attribute, or — with `page-meta` — the matching value from the page's
+   * own Open Graph tags (og:title, og:description, og:image, og:site_name).
+   */
+  #attr(name: string, metaKey?: "title" | "text" | "image" | "siteName"): string | undefined {
+    const own = this.getAttribute(name);
+    if (own !== null) return own;
+    if (!metaKey || !this.hasAttribute("page-meta")) return undefined;
+    return readPageMeta()[metaKey];
   }
 
   /** The link for a channel, tagged with utm_source when the `utm` attribute is set. */
@@ -208,7 +247,7 @@ export class ShareHopElement extends Base {
       {
         template: this.#template(),
         // Only absolute http(s) images are useful to share services (not data:/blob:).
-        image: httpImage(safeImage(this.getAttribute("image"))),
+        image: httpImage(safeImage(this.#attr("image", "image") ?? null)),
         env: this.#env ?? detectEnv(),
         lang: this.#rawLang(),
       },
@@ -223,7 +262,7 @@ export class ShareHopElement extends Base {
     const items: Item[] = [];
     for (const rawId of ids) {
       const id = rawId.toLowerCase() === "more" ? "native" : rawId.toLowerCase();
-      if (id === "copy" || id === "qr" || id === "native") {
+      if (id === "copy" || id === "qr" || id === "native" || id === "poster") {
         // "More" is only useful where a native share sheet exists — or in
         // WeChat, where it explains WeChat's own share menu instead.
         if (id === "native" && !env.wechat && !canNativeShare(data)) continue;
@@ -270,7 +309,7 @@ export class ShareHopElement extends Base {
     this.#rerendering = true;
     this.#root.innerHTML = isButton
       ? `<style>${styles}</style>
-         <button type="button" class="trigger" part="trigger" data-action="open" aria-haspopup="dialog">${icons.share}<span>${esc(L.share)}</span></button>
+         <slot name="trigger"><button type="button" class="trigger" part="trigger" data-action="open" aria-haspopup="dialog">${icons.share}<span>${esc(L.share)}</span></button></slot>
          <dialog part="dialog" aria-labelledby="${headingId}">${card}</dialog>${hint}`
       : `<style>${styles}</style>${card}${hint}`;
 
@@ -280,7 +319,7 @@ export class ShareHopElement extends Base {
     if (dialog) {
       dialog.addEventListener("close", () => {
         if (this.#rerendering) return;
-        this.#root.querySelector<HTMLElement>(".trigger")?.focus();
+        this.#triggerElement()?.focus();
         this.#emit("sh-close", { method: "dialog" });
       });
       if (wasOpen && this.isConnected) dialog.showModal();
@@ -301,6 +340,7 @@ export class ShareHopElement extends Base {
     slot?.addEventListener("slotchange", () => this.#syncPreview());
     this.#syncPreview();
     if (this.#qrOpen) this.#fillQr();
+    if (this.#posterOpen && data) void this.#fillPoster(data);
   }
 
   #cardBody(data: ShareData, L: ShareHopLabels, heading: string, headingId: string, isButton: boolean): string {
@@ -328,6 +368,8 @@ export class ShareHopElement extends Base {
               return `<button type="button" class="action" part="action action-qr" data-action="qr" aria-expanded="${this.#qrOpen}" aria-controls="${this.#id}-qr"${autofocus}>${inner(icons.qr, L.qr)}</button>`;
             case "native":
               return `<button type="button" class="action" part="action action-native" data-action="native"${autofocus}>${inner(icons.more, L.more)}</button>`;
+            case "poster":
+              return `<button type="button" class="action" part="action action-poster" data-action="poster" aria-expanded="${this.#posterOpen}" aria-controls="${this.#id}-poster"${autofocus}>${inner(icons.image, L.poster)}</button>`;
           }
         }
         const { target } = item;
@@ -371,6 +413,14 @@ export class ShareHopElement extends Base {
         <p class="qr-hint">${esc(L.scanHint)}</p>
         <button type="button" class="pill outline" part="download" data-action="download">${icons.download}<span>${esc(L.download)}</span></button>
       </div>
+      <div class="poster" part="poster" id="${this.#id}-poster" ${this.#posterOpen ? "" : "hidden"}>
+        <div class="poster-frame"><img class="poster-img" part="poster-image" alt="${esc(L.posterAlt)}" hidden><p class="poster-loading">${esc(L.posterLoading)}</p></div>
+        <p class="qr-hint">${esc((this.#env ?? detectEnv()).mobile ? L.posterHintMobile : L.posterHint)}</p>
+        <div class="poster-actions">
+          <button type="button" class="pill" part="poster-share" data-action="poster-share" hidden>${icons.share}<span>${esc(L.posterShare)}</span></button>
+          <button type="button" class="pill outline" part="poster-save" data-action="poster-save">${icons.download}<span>${esc(L.posterSave)}</span></button>
+        </div>
+      </div>
       <div class="url-row" part="url-row">
         <a class="url" part="url" href="${esc(data.url)}" target="_blank" rel="noopener noreferrer" title="${esc(L.openLink)}"><span class="url-text">${esc(data.url)}</span>${icons.external}</a>
         <button type="button" class="pill" part="copy-button" data-action="copy" data-method="copy-button">${esc(L.copy)}</button>
@@ -379,10 +429,10 @@ export class ShareHopElement extends Base {
   }
 
   #previewFallback(): string {
-    const title = this.getAttribute("preview-title");
+    const title = this.#attr("preview-title", "title") ?? null;
     const subtitle = this.getAttribute("preview-subtitle");
-    const meta = this.getAttribute("preview-meta");
-    const image = safeImage(this.getAttribute("image"));
+    const meta = this.#attr("preview-meta", "text") ?? null;
+    const image = safeImage(this.#attr("image", "image") ?? null);
     if (!title && !subtitle && !meta && !image) return "";
     return `${image ? `<img part="preview-image" src="${esc(image)}" alt="" loading="lazy">` : ""}
       <div class="preview-body">
@@ -447,6 +497,15 @@ export class ShareHopElement extends Base {
       case "download":
         void this.#download(data);
         break;
+      case "poster":
+        this.#togglePoster(data);
+        break;
+      case "poster-share":
+        void this.#sharePoster(data);
+        break;
+      case "poster-save":
+        void this.#savePoster(data);
+        break;
       case "native":
         void this.#native(data);
         break;
@@ -503,6 +562,106 @@ export class ShareHopElement extends Base {
       selection.removeAllRanges();
       selection.addRange(range);
     }
+  }
+
+  // ---- share poster -------------------------------------------------------
+
+  #togglePoster(data: ShareData, force?: boolean): void {
+    this.#posterOpen = force ?? !this.#posterOpen;
+    const panel = this.#root.querySelector<HTMLElement>(".poster");
+    if (panel) panel.hidden = !this.#posterOpen;
+    this.#root.querySelector('[data-action="poster"]')?.setAttribute("aria-expanded", String(this.#posterOpen));
+    if (this.#posterOpen) void this.#fillPoster(data);
+    this.#emit("sh-poster", { method: "poster", url: this.#urlFor("poster", data.url), open: this.#posterOpen });
+  }
+
+  /** What goes on the poster: the preview fields, falling back to the share fields. */
+  #posterOptions(data: ShareData) {
+    const L = this.#strings();
+    const format = this.getAttribute("poster-format");
+    const accent = getComputedStyle(this).getPropertyValue("--sh-poster-accent").trim() ||
+      getComputedStyle(this).getPropertyValue("--sh-accent").trim() || "#111111";
+    return {
+      url: this.#urlFor("poster", data.url),
+      title: this.#attr("preview-title", "title") ?? data.title ?? data.url,
+      subtitle: this.getAttribute("preview-subtitle") ?? undefined,
+      meta: this.#attr("preview-meta", "text") ?? data.text,
+      image: safeImage(this.#attr("image", "image") ?? null) ?? undefined,
+      brand: this.#attr("brand-name", "siteName") ?? globalThis.location?.hostname?.replace(/^www\./, ""),
+      caption: L.posterCaption,
+      accent: safeColor(accent) ? accent : "#111111",
+      format: (format === "story" || format === "square" ? format : "card") as PosterFormat,
+      font: getComputedStyle(this).getPropertyValue("--sh-poster-font").trim() || undefined,
+    };
+  }
+
+  /** Make (or reuse) the poster image and show it in the panel. */
+  async #fillPoster(data: ShareData): Promise<Blob | null> {
+    const options = this.#posterOptions(data);
+    const key = JSON.stringify(options);
+    const img = this.#root.querySelector<HTMLImageElement>(".poster-img");
+    const loading = this.#root.querySelector<HTMLElement>(".poster-loading");
+    const shareButton = this.#root.querySelector<HTMLElement>('[data-action="poster-share"]');
+    if (!this.#poster || this.#poster.key !== key) {
+      try {
+        const blob = await posterBlob(options);
+        if (this.#poster) URL.revokeObjectURL(this.#poster.url);
+        this.#poster = { key, blob, url: URL.createObjectURL(blob) };
+      } catch {
+        if (loading) loading.textContent = this.#strings().posterFailed;
+        return null;
+      }
+    }
+    const current = this.#root.querySelector<HTMLImageElement>(".poster-img") ?? img;
+    if (current) {
+      current.src = this.#poster.url;
+      current.hidden = false;
+    }
+    const currentLoading = this.#root.querySelector<HTMLElement>(".poster-loading") ?? loading;
+    if (currentLoading) currentLoading.hidden = true;
+    // Show "Share image" only where the share sheet accepts image files.
+    const file = this.#posterFile(data);
+    const canShareFile = !!file && typeof navigator.canShare === "function" && navigator.canShare({ files: [file] });
+    const btn = this.#root.querySelector<HTMLElement>('[data-action="poster-share"]') ?? shareButton;
+    if (btn) btn.hidden = !canShareFile;
+    return this.#poster.blob;
+  }
+
+  #posterFile(data: ShareData): File | null {
+    if (!this.#poster || typeof File === "undefined") return null;
+    return new File([this.#poster.blob], `${slug(data.title) || "share"}.png`, { type: "image/png" });
+  }
+
+  /** Send the poster through the system share sheet (WeChat, Instagram, Messages…). */
+  async #sharePoster(data: ShareData): Promise<void> {
+    const file = this.#posterFile(data);
+    const url = this.#urlFor("poster", data.url);
+    if (!file) return;
+    try {
+      // Only the file: some apps ignore the image when text or a URL is attached.
+      await navigator.share({ files: [file] });
+      this.#emit("sh-poster", { method: "poster-share", url, ok: true, result: "shared" });
+    } catch (error) {
+      const cancelled = (error as { name?: string } | null)?.name === "AbortError";
+      this.#emit("sh-poster", { method: "poster-share", url, ok: false, result: cancelled ? "cancelled" : "failed" });
+      if (!cancelled) this.#status(this.#strings().shareFailed, true);
+    }
+  }
+
+  async #savePoster(data: ShareData): Promise<void> {
+    const url = this.#urlFor("poster", data.url);
+    const blob = this.#poster?.blob ?? (await this.#fillPoster(data));
+    if (!blob || !this.#poster) {
+      this.#emit("sh-poster", { method: "poster-save", url, ok: false });
+      return;
+    }
+    const a = document.createElement("a");
+    a.href = this.#poster.url;
+    a.download = `${slug(data.title) || "share"}.png`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    this.#emit("sh-poster", { method: "poster-save", url, ok: true });
   }
 
   #toggleQr(data: ShareData, force?: boolean): void {

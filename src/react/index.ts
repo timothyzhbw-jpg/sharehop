@@ -26,6 +26,16 @@ export interface ShareHopProps {
   targets?: ShareTarget[];
   /** Colour app icons in their brand colours. */
   brandColors?: boolean;
+  /** Fill missing title, text, image and preview from the page's Open Graph tags. */
+  pageMeta?: boolean;
+  /** "plain" drops the card border, padding and background (to sit inside your own card or sheet). */
+  appearance?: "card" | "plain";
+  /** Brand name printed on the share image (default: og:site_name or the host name). */
+  brandName?: string;
+  /** Share image size: "card" 4:5 (default), "story" 9:16, "square". */
+  posterFormat?: "card" | "story" | "square";
+  /** Your own trigger button for mode="button" (e.g. your design system's Button). */
+  trigger?: ReactNode;
   /** "panel" renders inline (default); "button" renders a Share button that opens the panel. */
   mode?: "panel" | "button";
   /** "en" or "zh" for the widget's text; other codes ("ko", "ja", "ru") pick app names where they differ. */
@@ -52,6 +62,7 @@ export interface ShareHopProps {
   onDownload?: (event: ShareHopEvent) => void;
   onOpen?: (event: ShareHopEvent) => void;
   onClose?: (event: ShareHopEvent) => void;
+  onPoster?: (event: ShareHopEvent) => void;
 }
 
 const EVENTS = {
@@ -61,6 +72,7 @@ const EVENTS = {
   onDownload: "sh-download",
   onOpen: "sh-open",
   onClose: "sh-close",
+  onPoster: "sh-poster",
 } as const;
 
 /**
@@ -135,11 +147,16 @@ export function ShareHop(props: ShareHopProps) {
       utm: flag(props.utm),
       closable: flag(props.closable),
       "brand-colors": flag(props.brandColors),
+      "page-meta": flag(props.pageMeta),
+      appearance: props.appearance,
+      "brand-name": props.brandName,
+      "poster-format": props.posterFormat,
       image: props.image,
       "preview-title": props.previewTitle,
       "preview-subtitle": props.previewSubtitle,
       "preview-meta": props.previewMeta,
     },
     props.children == null ? null : createElement("div", { slot: "preview" }, props.children),
+    props.trigger == null ? null : createElement("span", { slot: "trigger", style: { display: "contents" } }, props.trigger),
   );
 }

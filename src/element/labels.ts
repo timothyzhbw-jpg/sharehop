@@ -31,6 +31,17 @@ export interface ShareHopLabels {
   copiedScan: string;
   scanWith: string;
   menuHint: string;
+  /** Share image (poster) */
+  poster: string;
+  posterAlt: string;
+  posterLoading: string;
+  posterFailed: string;
+  posterHint: string;
+  posterHintMobile: string;
+  posterShare: string;
+  posterSave: string;
+  /** Printed on the poster under the brand name. */
+  posterCaption: string;
 }
 
 export type ShareHopLang = "en" | "zh";
@@ -63,6 +74,15 @@ export const LABELS: Record<ShareHopLang, ShareHopLabels> = {
     copiedScan: "Link copied. To send it from your phone, scan the QR code with {app}.",
     scanWith: "Scan the QR code with {app} on your phone.",
     menuHint: "Tap ··· in the top-right corner to share in {app}.",
+    poster: "Image",
+    posterAlt: "Share image with a QR code",
+    posterLoading: "Making the image…",
+    posterFailed: "Couldn't make the image.",
+    posterHint: "Save the image and send it anywhere — the QR code opens the link.",
+    posterHintMobile: "Tap Share image, or press and hold the image to save it.",
+    posterShare: "Share image",
+    posterSave: "Save image",
+    posterCaption: "Scan the QR code to view",
   },
   zh: {
     share: "分享",
@@ -91,6 +111,15 @@ export const LABELS: Record<ShareHopLang, ShareHopLabels> = {
     copiedScan: "链接已复制。也可以用手机{app}扫描二维码发送。",
     scanWith: "用手机{app}扫描二维码即可分享。",
     menuHint: "点右上角 ··· 即可分享到{app}。",
+    poster: "分享图",
+    posterAlt: "带二维码的分享图",
+    posterLoading: "正在生成图片…",
+    posterFailed: "图片生成失败。",
+    posterHint: "保存图片发到任何地方，扫码就能打开链接。",
+    posterHintMobile: "点「分享图片」，或长按图片保存。",
+    posterShare: "分享图片",
+    posterSave: "保存图片",
+    posterCaption: "长按识别二维码查看",
   },
 };
 

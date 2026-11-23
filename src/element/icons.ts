@@ -13,6 +13,7 @@ export const icons = {
     '<circle cx="17.5" cy="5.5" r="2.5"/><circle cx="6.5" cy="12" r="2.5"/><circle cx="17.5" cy="18.5" r="2.5"/><path d="M8.7 10.7l6.6-3.9M8.7 13.3l6.6 3.9"/>',
   ),
   mail: svg('<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3.5 6.5l8.5 6.5 8.5-6.5"/>'),
+  image: svg('<rect x="3.5" y="4" width="17" height="16" rx="2.5"/><circle cx="9" cy="9.5" r="1.75"/><path d="M20.5 15.5l-4.8-4.8L6 20"/>'),
   close: svg('<path d="M6 6l12 12M18 6L6 18"/>'),
   external: svg('<path d="M8 16L16 8M9.5 8H16v6.5"/>'),
   download: svg('<path d="M12 4v11M7 10.5l5 5 5-5M5 20h14"/>'),

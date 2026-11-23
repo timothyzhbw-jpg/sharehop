@@ -98,7 +98,7 @@ export interface ShareTarget {
 }
 
 /** Ids the widget uses for its own buttons; targets can't take them. */
-export const RESERVED_IDS: readonly string[] = ["copy", "qr", "native", "more"];
+export const RESERVED_IDS: readonly string[] = ["copy", "qr", "native", "more", "poster"];
 
 const ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,39}$/;
 
