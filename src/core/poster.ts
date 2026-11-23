@@ -9,7 +9,7 @@ import { qrMatrix } from "./qr.ts";
 export type PosterFormat = "card" | "story" | "square";
 
 export interface PosterOptions {
-  /** The link the QR code opens. */
+  /** The link the QR code opens. Shorter links make bigger, easier-to-scan modules. */
   url: string;
   title: string;
   /** Bold accent line, e.g. a price ("$70"). */
@@ -85,8 +85,11 @@ export async function posterCanvas(options: PosterOptions): Promise<HTMLCanvasEl
   const innerW = w - pad * 2;
   let y = y0 + pad;
 
+  // QR code: big enough to survive chat apps shrinking the image to ~720 px wide
+  // (≥ 4 px per module), with a 4-module quiet zone.
+  const qrSize = format === "story" ? 280 : 300;
   // Photo (cover-cropped, rounded) — or a tinted block when there is none.
-  const footerH = 260;
+  const footerH = qrSize + 40;
   const textH = 56 * 2 + 16 + (options.subtitle ? 84 : 0) + (options.meta ? 56 : 0) + 24;
   const photoH = Math.max(240, h - pad * 2 - footerH - textH - 32);
   ctx.save();
@@ -123,13 +126,12 @@ export async function posterCanvas(options: PosterOptions): Promise<HTMLCanvasEl
   }
 
   // Footer: divider, brand + caption on the left, QR code on the right.
-  const qrSize = 216;
   const footerTop = y0 + h - pad - qrSize;
   ctx.fillStyle = "#ececec";
   ctx.fillRect(innerX, footerTop - 32, innerW, 2);
   drawQr(ctx, options.url, innerX + innerW - qrSize, footerTop, qrSize);
   const textW = innerW - qrSize - 32;
-  let fy = footerTop + 40;
+  let fy = footerTop + Math.max(24, qrSize / 2 - 70);
   if (options.brand) {
     ctx.fillStyle = accent;
     ctx.font = `800 44px ${font}`;
@@ -204,14 +206,20 @@ function fit(ctx: CanvasRenderingContext2D, text: string, width: number): string
 
 function drawQr(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, size: number): void {
   const matrix = qrMatrix(text, "M");
-  const quiet = 3;
-  const cell = size / (matrix.length + quiet * 2);
+  const quiet = 4;
+  const total = matrix.length + quiet * 2;
+  // Whole, even pixels per module: edges stay sharp at full size and when an
+  // app halves the image, which keeps the code scannable after compression.
+  const cell = Math.max(2, Math.floor(size / total / 2) * 2);
+  const offset = Math.floor((size - cell * total) / 2);
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(x, y, size, size);
   ctx.fillStyle = "#000000";
+  const ox = Math.round(x) + offset + quiet * cell;
+  const oy = Math.round(y) + offset + quiet * cell;
   matrix.forEach((row, r) =>
     row.forEach((on, c) => {
-      if (on) ctx.fillRect(x + (c + quiet) * cell, y + (r + quiet) * cell, Math.ceil(cell), Math.ceil(cell));
+      if (on) ctx.fillRect(ox + c * cell, oy + r * cell, cell, cell);
     }),
   );
 }

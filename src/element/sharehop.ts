@@ -73,6 +73,7 @@ export class ShareHopElement extends Base {
     "appearance",
     "brand-name",
     "poster-format",
+    "qr-url",
   ];
 
   #root: ShadowRoot;
@@ -226,6 +227,16 @@ export class ShareHopElement extends Base {
     if (own !== null) return own;
     if (!metaKey || !this.hasAttribute("page-meta")) return undefined;
     return readPageMeta()[metaKey];
+  }
+
+  /**
+   * What QR codes (panel and poster) encode: `qr-url` if set — a short link on
+   * your own domain scans best — otherwise the share link for that channel.
+   */
+  #qrTarget(channel: "qr" | "poster", url: string): string {
+    const attr = this.getAttribute("qr-url");
+    const short = attr ? resolveShareUrl(attr, globalThis.document?.baseURI) : null;
+    return short ?? this.#urlFor(channel, url);
   }
 
   /** The link for a channel, tagged with utm_source when the `utm` attribute is set. */
@@ -421,7 +432,7 @@ export class ShareHopElement extends Base {
           <button type="button" class="chip" data-action="poster-format" data-format="story" aria-pressed="${this.#currentPosterFormat() === "story"}">${esc(L.posterStory)}</button>
         </div>
         <div class="poster-frame" data-format="${this.#currentPosterFormat()}"><img class="poster-img" part="poster-image" alt="${esc(L.posterAlt)}" hidden><p class="poster-loading">${esc(L.posterLoading)}</p></div>
-        <p class="qr-hint">${esc((this.#env ?? detectEnv()).mobile ? L.posterHintMobile : L.posterHint)}</p>
+        <p class="qr-hint">${esc(this.#posterHint(L))}</p>
         <div class="poster-actions">
           <button type="button" class="pill" part="poster-share" data-action="poster-share" hidden>${icons.share}<span>${esc(L.posterShare)}</span></button>
           <button type="button" class="pill outline" part="poster-save" data-action="poster-save">${icons.download}<span>${esc(L.posterSave)}</span></button>
@@ -464,7 +475,7 @@ export class ShareHopElement extends Base {
     const data = this.#data();
     const box = this.#root.querySelector<HTMLElement>(".qr-code");
     if (!data || !box) return;
-    box.innerHTML = qrSvg(this.#urlFor("qr", data.url));
+    box.innerHTML = qrSvg(this.#qrTarget("qr", data.url));
   }
 
   // ---- interaction ----------------------------------------------------------
@@ -589,6 +600,20 @@ export class ShareHopElement extends Base {
     this.#emit("sh-poster", { method: "poster", url: this.#urlFor("poster", data.url), open: this.#posterOpen });
   }
 
+  /** The ··· menu hint inside WeChat, pointing to the share image when there is one. */
+  #wechatHint(): string {
+    const L = this.#strings();
+    const hasPoster = !!this.#root.querySelector('[data-action="poster"]');
+    if (!hasPoster) return L.wechatHint;
+    // No space after Chinese/Japanese full stops.
+    return /[。！？]$/.test(L.wechatHint) ? L.wechatHint + L.wechatHintPoster : `${L.wechatHint} ${L.wechatHintPoster}`;
+  }
+
+  #posterHint(L: ShareHopLabels): string {
+    const env = this.#env ?? detectEnv();
+    return env.wechat ? L.posterHintWeChat : env.mobile ? L.posterHintMobile : L.posterHint;
+  }
+
   #currentPosterFormat(): PosterFormat {
     if (this.#posterFormat) return this.#posterFormat;
     const attr = this.getAttribute("poster-format");
@@ -601,7 +626,7 @@ export class ShareHopElement extends Base {
     const accent = getComputedStyle(this).getPropertyValue("--sh-poster-accent").trim() ||
       getComputedStyle(this).getPropertyValue("--sh-accent").trim() || "#111111";
     return {
-      url: this.#urlFor("poster", data.url),
+      url: this.#qrTarget("poster", data.url),
       title: this.#attr("preview-title", "title") ?? data.title ?? data.url,
       subtitle: this.getAttribute("preview-subtitle") ?? undefined,
       meta: this.#attr("preview-meta", "text") ?? data.text,
@@ -638,7 +663,9 @@ export class ShareHopElement extends Base {
     }
     const current = this.#root.querySelector<HTMLImageElement>(".poster-img") ?? img;
     if (current) {
-      current.src = this.#poster.url;
+      // WeChat's browser offers "send to friend / save / scan QR" on long-press
+      // only for real images, so give it a data: URL rather than a blob: URL.
+      current.src = (this.#env ?? detectEnv()).wechat ? await blobToDataUrl(this.#poster.blob) : this.#poster.url;
       current.hidden = false;
     }
     const currentLoading = this.#root.querySelector<HTMLElement>(".poster-loading") ?? loading;
@@ -702,7 +729,7 @@ export class ShareHopElement extends Base {
   async #download(data: ShareData): Promise<void> {
     const url = this.#urlFor("qr", data.url);
     try {
-      const blob = await qrPngBlob(url, { scale: 12 });
+      const blob = await qrPngBlob(this.#qrTarget("qr", data.url), { scale: 12 });
       const href = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = href;
@@ -719,7 +746,7 @@ export class ShareHopElement extends Base {
 
   async #native(data: ShareData): Promise<void> {
     if (this.#env?.wechat) {
-      this.#hint(this.#strings().wechatHint, this.#root.querySelector<HTMLElement>('[data-action="native"]'));
+      this.#hint(this.#wechatHint(), this.#root.querySelector<HTMLElement>('[data-action="native"]'));
       this.#emit("sh-share", { method: "wechat-hint", url: data.url });
       return;
     }
@@ -760,7 +787,7 @@ export class ShareHopElement extends Base {
 
     // 1. Already inside this app's browser (e.g. WeChat): its own ··· menu is the way to share.
     if (target.insideApp?.(ctx.env)) {
-      this.#hint(target.id === "wechat" ? L.wechatHint : fill(L.menuHint, name), origin);
+      this.#hint(target.id === "wechat" ? this.#wechatHint() : fill(L.menuHint, name), origin);
       report({ result: "menu-hint" });
       return;
     }
@@ -771,7 +798,9 @@ export class ShareHopElement extends Base {
     if (target.desktop === "qr" && !ctx.env.mobile) {
       const ok = await copyNow(copyValue);
       this.#toggleQr(data, true);
-      this.#status(fill(ok ? L.copiedScan : L.scanWith, name), true);
+      // Opening the page by scanning, then sharing from ···, sends a card in WeChat.
+      const message = target.id === "wechat" ? (ok ? L.wechatScanCopied : L.wechatScan) : ok ? L.copiedScan : L.scanWith;
+      this.#status(fill(message, name), true);
       report({ result: "qr", ok });
       return;
     }
@@ -911,6 +940,15 @@ function safeImage(src: string | null): string | null {
   } catch {
     return null;
   }
+}
+
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
 }
 
 function httpImage(src: string | null): string {

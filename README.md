@@ -207,6 +207,56 @@ registerShareTarget({
 
 Without the widget, `shareTargetUrl("telegram", { url, title, text })` returns the share URL for any target.
 
+## Share image
+
+Add `poster` to `actions` for a **share image**: one picture with the item's photo, title, price (`preview-subtitle`), a short line (`preview-meta`), your brand name and a QR code that opens the link.
+
+```html
+<share-hop page-meta preview-subtitle="$70" actions="copy,poster,wechat,instagram,native"></share-hop>
+```
+
+It is made for apps that don't turn pasted links into cards — WeChat chats and Instagram Stories in particular:
+
+- On phones, **Share image** sends it through the system share sheet (WeChat, Instagram, Messages…); **Save image** downloads it; the image can also be pressed and held to save.
+- Inside WeChat's browser it is shown as a real image, so press-and-hold offers "send to friend", "save" and "scan QR code".
+- Users can switch between **4:5** (chats and posts) and **9:16** (Stories) in the panel.
+- The QR code is drawn with whole-pixel modules and a 4-module quiet zone; it still scans after the image is shrunk to ~360 px wide and recompressed as JPEG. Pass `qr-url` with a short link on your own domain for an even sturdier code — never a third-party shortener (WeChat treats redirect chains as evasion).
+- The photo needs CORS (`Access-Control-Allow-Origin`), e.g. public Supabase or S3 buckets; without it the image is drawn without the photo. Colour comes from `--sh-poster-accent` (else `--sh-accent`), the font from `--sh-poster-font` (it must already be loaded).
+
+Without the widget: `posterBlob({ url, title, subtitle, meta, image, brand, format })` returns the PNG.
+
+## Fit it into your site
+
+- **Your own button:** put any element with `slot="trigger"` inside a `mode="button"` widget (React: the `trigger` prop). It opens the panel, and focus returns to it on close.
+
+  ```html
+  <share-hop mode="button" page-meta>
+    <button slot="trigger" class="your-button">Share</button>
+  </share-hop>
+  ```
+- **No card chrome:** `appearance="plain"` when the widget sits inside your own card, sheet or modal.
+- **Your design tokens:** see [Styling](#styling) — colours, font, card radius, border and shadow, button height, radius and weight, trigger style, icon tiles and heading/label sizes are all variables.
+- **Use the tags you already have:** `page-meta` reads `og:title`, `og:description`, `og:image` and `og:site_name`, so a page with good link previews needs no extra attributes.
+
+## Analytics
+
+`onShareActivity()` hears every share from every widget on the page, in one shape (`type`, `channel`, `url`, `ok`, `result`, `title`, `widgetId`, `timestamp`):
+
+```js
+import { onShareActivity } from "sharehop"; // window.ShareHop.onShareActivity with the script tag
+
+// GA4's recommended "share" event
+onShareActivity((e) => gtag("event", "share", { method: e.channel, content_type: "listing", item_id: e.url }));
+
+// PostHog
+onShareActivity((e) => posthog.capture("share", e));
+
+// Your own endpoint (survives page unloads)
+onShareActivity((e) => navigator.sendBeacon("/api/share-events", JSON.stringify(e)));
+```
+
+These are **taps**, not completed shares: browsers and apps (WeChat since 2018) don't report whether the user actually sent anything. Native share does report `shared` / `cancelled`.
+
 ## Attributes
 
 | Attribute | React prop | Default | What it does |
@@ -216,7 +266,7 @@ Without the widget, `shareTargetUrl("telegram", { url, title, text })` returns t
 | `share-text` | `shareText` | — | One-line description added to the share message. |
 | `template` | `template` | `{title} — {text}` + newline + `{url}` | Custom share message. Empty lines are dropped. |
 | `heading` | `heading` | "Share" | Panel heading, e.g. "Share this listing". |
-| `actions` | `actions` | `copy,qr,whatsapp,native` | Buttons to show, in order: `copy`, `qr`, `native` (or `more`), app ids and `@presets`. |
+| `actions` | `actions` | `copy,qr,whatsapp,native` | Buttons to show, in order: `copy`, `qr`, `poster` (share image), `native` (or `more`), app ids and `@presets`. |
 | `brand-colors` | `brandColors` | off | Show app icons as tiles in their brand colours. |
 | `mode` | `mode` | `panel` | `panel` renders inline; `button` renders a Share button that opens the panel in a dialog (a bottom sheet on phones). |
 | `lang` | `lang` | page language | `en` or `zh` for the widget's text (app names also have `ko`, `ja`, `ru` where they differ). Falls back to the nearest `lang` attribute, then English. |
@@ -224,6 +274,11 @@ Without the widget, `shareTargetUrl("telegram", { url, title, text })` returns t
 | `utm` | `utm` | off | Adds `utm_source=<channel>&utm_medium=share` to shared links (`copy`, `qr`, `native` or the app id). The visible link stays clean. |
 | `closable` | `closable` | off | Shows a × in panel mode. Clicking it hides the widget unless `sh-close` is cancelled. |
 | `image`, `preview-title`, `preview-subtitle`, `preview-meta` | `image`, `previewTitle`, … | — | Optional preview card above the panel (image, title, a bold line such as a price, a muted line). `image` (if it is an absolute http(s) URL) is also sent to Pinterest, Weibo, Qzone and others. |
+| `page-meta` | `pageMeta` | off | Fill missing `share-title`, `share-text`, `image` and the preview from the page's own Open Graph tags. |
+| `appearance` | `appearance` | `card` | `plain` drops the card's border, padding and background, to sit inside your own card or sheet. |
+| `brand-name` | `brandName` | `og:site_name`, else the host | Name printed on the share image. |
+| `poster-format` | `posterFormat` | `card` | Share image size: `card` 1080×1350 (4:5), `story` 1080×1920 (9:16), `square`. Users can switch in the panel. |
+| `qr-url` | `qrUrl` | the share link | What the QR codes encode. A short link on your own domain (e.g. `https://example.com/m/abc`) scans more easily. |
 
 For a fully custom preview, put your own markup in the `preview` slot (in React: pass `children`):
 
@@ -241,7 +296,7 @@ Override any built-in text with the `labels` property:
 document.querySelector("share-hop").labels = { copyLink: "Copy store link", qr: "Scan" };
 ```
 
-Keys: `share, heading, copyLink, qr, more, copy, copied, linkCopied, copyFailed, shareFailed, openLink, close, scanHint, download, qrAlt, wechatHint, gotIt, noUrl, copiedOpening, opening, appNotOpened, appNotOpenedCopied, copiedPaste, copiedScan, scanWith, menuHint` (`{app}` in the last ones is replaced by the app's name).
+Keys: `share, heading, copyLink, qr, more, copy, copied, linkCopied, copyFailed, shareFailed, openLink, close, scanHint, download, qrAlt, wechatHint, gotIt, noUrl, copiedOpening, opening, appNotOpened, appNotOpenedCopied, copiedPaste, copiedScan, scanWith, menuHint, wechatHintPoster, wechatScan, wechatScanCopied, poster, posterAlt, posterLoading, posterFailed, posterHint, posterHintMobile, posterHintWeChat, posterShare, posterSave, posterCaption, posterSize, posterCard, posterStory` (`{app}` is replaced by the app's name).
 
 ### Methods
 
@@ -260,10 +315,22 @@ share-hop {
   --sh-bg: #fff;  --sh-fg: #111;  --sh-muted: #6b6b6b;  --sh-border: #e7e7e7;
   --sh-hover: rgba(0,0,0,.05);  --sh-focus: #2563eb;  --sh-success: #15803d;
   --sh-tile: rgba(0,0,0,.06); /* neutral icon tiles with brand-colors */
+
+  /* card */
+  --sh-card-padding: 24px;  --sh-card-border: 1px solid #e7e7e7;  --sh-card-shadow: none;
+  /* buttons (Copy, Share image, the built-in trigger) */
+  --sh-button-height: 44px;  --sh-button-radius: 999px;  --sh-button-font-size: 16px;  --sh-button-weight: 600;
+  --sh-trigger-bg: #fff;  --sh-trigger-fg: #111;  --sh-trigger-border: 1px solid #e7e7e7;  --sh-trigger-font-size: inherit;
+  /* app icons and text */
+  --sh-tile-size: 48px;  --sh-tile-radius: 14px;  --sh-heading-size: 20px;  --sh-heading-weight: 600;  --sh-label-size: 14px;
+  --sh-preview-lines: 2;     /* lines of preview-meta before it is cut */
+  /* dialog and share image */
+  --sh-backdrop: rgba(0,0,0,.45);  --sh-dialog-shadow: 0 24px 64px rgba(0,0,0,.25);
+  --sh-poster-accent: #b45309;  --sh-poster-font: Georgia, serif;
 }
 ```
 
-For deeper changes, style the exposed parts: `share-hop::part(card)`, `heading`, `actions`, `action`, `action-copy`, `action-qr`, `action-native`, `action-target`, `action-<app id>` (e.g. `action-wechat`), `qr`, `qr-code`, `download`, `url-row`, `url`, `copy-button`, `status`, `trigger`, `dialog`, `close`, `preview`, `preview-image`, `preview-title`, `preview-subtitle`, `preview-meta`, `divider`, `wechat-hint`.
+For deeper changes, style the exposed parts: `share-hop::part(card)`, `heading`, `actions`, `action`, `action-copy`, `action-qr`, `action-poster`, `action-native`, `action-target`, `action-<app id>` (e.g. `action-wechat`), `qr`, `qr-code`, `download`, `poster`, `poster-image`, `poster-share`, `poster-save`, `url-row`, `url`, `copy-button`, `status`, `trigger`, `dialog`, `close`, `preview`, `preview-image`, `preview-title`, `preview-subtitle`, `preview-meta`, `divider`, `wechat-hint`.
 
 Buttons are laid out in as many columns as fit (about 4 on a phone, more on a wide card); extra ones wrap onto further rows.
 
@@ -279,23 +346,34 @@ Every event bubbles out of the element with `detail.method` and `detail.url` (th
 | `sh-share` | An app or the native share was used | `method`: the app id, `native` or `wechat-hint`. `result` for native: `shared`, `cancelled`, `failed`, `unsupported`; for app launches: `opened`, `not-opened`, `unknown`, `blocked`, `copied`, `qr`, `menu-hint`. `ok` where known |
 | `sh-qr` | QR panel opened or closed | `open` |
 | `sh-download` | QR PNG downloaded | `ok` |
+| `sh-poster` | Share image opened, shared or saved | `method`: `poster`, `poster-share`, `poster-save`; `open`, `ok`, `result` |
 | `sh-open` / `sh-close` | Dialog opened / closed (or panel closed with ×) | `sh-close` from × is cancelable |
 
 ```js
 document.addEventListener("sh-share", (e) => analytics.track("share", e.detail));
 ```
 
-## WeChat and link previews
+## WeChat, Instagram and link previews
 
-- WeChat's built-in browser has no Web Share API, and its share menu can't be opened from a page without WeChat's JS-SDK (which needs an official account and app ID). So inside WeChat the widget points to the ··· menu; elsewhere it copies the message and opens WeChat, or shows a QR code on computers.
-- The card that WeChat, WhatsApp, iMessage, Facebook, LinkedIn, etc. show for a shared link comes from **the shared page's own meta tags**, not from this widget (Facebook and LinkedIn ignore any text you pass). Make sure each shareable page has:
+Most apps (WhatsApp, iMessage, Telegram, LINE, Slack, Discord, Instagram DMs, X, Facebook, LinkedIn…) turn a shared link into a card using **the page's own Open Graph tags**, not anything this widget sends (Facebook and LinkedIn ignore passed text). Make sure each shareable page has, server-rendered:
 
-  ```html
-  <meta property="og:title" content="27-inch Monitor — $85">
-  <meta property="og:description" content="Pickup in New Brunswick">
-  <meta property="og:image" content="https://example.com/images/monitor-1200x630.jpg">
-  <meta property="og:url" content="https://example.com/marketplace/27-inch-monitor">
-  ```
+```html
+<meta property="og:title" content="$70 · Essentials Fear of God Pants">
+<meta property="og:description" content="New · Livingston · Pickup / Delivery">
+<meta property="og:image" content="https://example.com/og/listing-123.jpg">  <!-- 1200×630 (1.91:1) -->
+<meta property="og:image:width" content="1200"> <meta property="og:image:height" content="630">
+<meta property="og:url" content="https://example.com/marketplace/123">     <!-- the final URL, not one that redirects -->
+```
+
+**WeChat is different** (checked against WeChat's own docs and notices, November 2026):
+
+- A link **pasted** into a chat or group is sent as plain blue text — WeChat never reads Open Graph tags.
+- A page shared from the **··· menu inside WeChat's browser** becomes a card, with the page's `<title>` (truncated) and a default icon. Put the important part (e.g. the price) at the start of `<title>`. It only comes out as a card if the page was opened by **scanning a QR code**, from another card, from Favorites or from an Official Account — a page opened from a pasted blue link re-shares as plain text. That's why, on computers, the WeChat button shows a QR code and says "scan, then ··· → Send to Chat".
+- A **custom** card (your title, image and price, like links shared from the Xiaohongshu app) needs WeChat's JS-SDK, which requires a WeChat-verified Official Account **and** an ICP-filed domain. Sites outside mainland China usually can't meet that. The Xiaohongshu card itself comes from its native app's WeChat SDK, which web pages cannot use.
+- What works without any account: the **share image** — the photo and price show in the group, and anyone can press and hold the QR code to open the page (which also makes later ··· shares cards).
+- WeChat's external-link rules ban rewards or unlocks for sharing, "must forward" wording, WeChat look-alike visuals and third-party redirect links. Keep your share copy plain.
+
+**Instagram:** links pasted in Direct messages become cards (from Open Graph tags). There is no web way to open the Stories composer — use the share image (9:16) through the share sheet; Instagram then offers Story, post or chat. Links in post captions are not clickable.
 
 ## Browser support
 
@@ -308,6 +386,8 @@ Opening apps can't be fully tested without the real devices and apps: detection 
 一个可以放进任何网站的分享面板：复制链接、二维码（可下载 PNG）、手机系统分享，以及 40 多个 App——微信、QQ、微博、小红书、抖音、QQ 空间、豆瓣、WhatsApp、Instagram、LINE、X、KakaoTalk……能预填内容的 App 会直接带着文案打开；微信、小红书、抖音、Instagram 这类不能预填的，会先复制文案再打开 App，用户粘贴即可；电脑上点微信或 QQ 会显示二维码让手机扫。在微信内置浏览器里会提示用右上角 ··· 分享。
 
 目前还没上 npm，可以直接从 GitHub 安装：`npm install https://github.com/timothyzhbw-jpg/sharehop/releases/download/v0.2.0/sharehop-0.2.0.tgz`，或者在网页里用 `<script src="https://cdn.jsdelivr.net/gh/timothyzhbw-jpg/sharehop@v0.2.0/dist/sharehop.global.js"></script>`。
+
+加上 `poster` 就有「分享图」：商品图、标题、价格和二维码合成一张图，在微信群和 Instagram 快拍这种不显示链接卡片的地方也好看，长按就能识别二维码。微信里直接粘贴的链接永远只是一行蓝字；从微信内置浏览器的 ··· 分享会是卡片（扫码打开的页面才行）；自定义卡片需要认证公众号加 ICP 备案的域名。
 
 用 `actions="copy,qr,@china"` 一次加上中国常用 App；用 `registerShareTarget()` 可以接入任何别的 App（插口），一个 URL 模板就够了。内置中英文（`lang="zh"`），分享文案可以用 `template` 自定义，加上 `utm` 后每个渠道的链接会带上 `utm_source`，方便统计。
 

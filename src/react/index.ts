@@ -34,6 +34,8 @@ export interface ShareHopProps {
   brandName?: string;
   /** Share image size: "card" 4:5 (default), "story" 9:16, "square". */
   posterFormat?: "card" | "story" | "square";
+  /** What QR codes encode (default: the share link). A short link on your own domain scans best. */
+  qrUrl?: string;
   /** Your own trigger button for mode="button" (e.g. your design system's Button). */
   trigger?: ReactNode;
   /** "panel" renders inline (default); "button" renders a Share button that opens the panel. */
@@ -151,6 +153,7 @@ export function ShareHop(props: ShareHopProps) {
       appearance: props.appearance,
       "brand-name": props.brandName,
       "poster-format": props.posterFormat,
+      "qr-url": props.qrUrl,
       image: props.image,
       "preview-title": props.previewTitle,
       "preview-subtitle": props.previewSubtitle,

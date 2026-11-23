@@ -20,6 +20,8 @@ export interface ShareHopLabels {
   download: string;
   qrAlt: string;
   wechatHint: string;
+  /** Added to wechatHint when the widget shows the share-image button. */
+  wechatHintPoster: string;
   gotIt: string;
   noUrl: string;
   /** App hand-off messages; {app} is replaced by the app's name. */
@@ -42,6 +44,10 @@ export interface ShareHopLabels {
   posterSave: string;
   /** Printed on the poster under the brand name. */
   posterCaption: string;
+  posterHintWeChat: string;
+  /** WeChat on a computer: scanning then sharing from ··· sends a card. */
+  wechatScan: string;
+  wechatScanCopied: string;
   posterSize: string;
   posterCard: string;
   posterStory: string;
@@ -67,6 +73,7 @@ export const LABELS: Record<ShareHopLang, ShareHopLabels> = {
     download: "Download PNG",
     qrAlt: "QR code for this link",
     wechatHint: "Tap ··· in the top-right corner, then choose Send to Chat or Share to Moments.",
+    wechatHintPoster: "Or send the share image: it shows the photo and price, and the QR code opens the page.",
     gotIt: "Got it",
     noUrl: "There is no link to share on this page.",
     copiedOpening: "Link copied — opening {app}…",
@@ -86,6 +93,9 @@ export const LABELS: Record<ShareHopLang, ShareHopLabels> = {
     posterShare: "Share image",
     posterSave: "Save image",
     posterCaption: "Scan the QR code to view",
+    posterHintWeChat: "Press and hold the image to send it to a chat, save it, or scan the QR code.",
+    wechatScan: "Scan the QR code with WeChat to open the page there, then tap ··· and choose Send to Chat — it arrives as a card.",
+    wechatScanCopied: "Link copied. To send a card instead, scan the QR code with WeChat, then tap ··· and choose Send to Chat.",
     posterSize: "Image size",
     posterCard: "Chats & posts 4:5",
     posterStory: "Stories 9:16",
@@ -107,6 +117,7 @@ export const LABELS: Record<ShareHopLang, ShareHopLabels> = {
     download: "下载 PNG",
     qrAlt: "此链接的二维码",
     wechatHint: "点右上角 ···，选择「发送给朋友」或「分享到朋友圈」。",
+    wechatHintPoster: "也可以发「分享图」：图里有商品图和价格，扫码就能打开。",
     gotIt: "知道了",
     noUrl: "这个页面没有可以分享的链接。",
     copiedOpening: "链接已复制，正在打开{app}…",
@@ -126,6 +137,9 @@ export const LABELS: Record<ShareHopLang, ShareHopLabels> = {
     posterShare: "分享图片",
     posterSave: "保存图片",
     posterCaption: "长按识别二维码查看",
+    posterHintWeChat: "长按图片可以发送给朋友、保存，或识别二维码。",
+    wechatScan: "用微信扫码打开，再点右上角 ··· 发送给朋友，发出去就是卡片。",
+    wechatScanCopied: "链接已复制。想发成卡片：用微信扫码打开，再点右上角 ··· 发送给朋友。",
     posterSize: "图片尺寸",
     posterCard: "聊天/帖子 4:5",
     posterStory: "快拍 9:16",
