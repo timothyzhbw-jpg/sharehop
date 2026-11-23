@@ -98,6 +98,10 @@ export class ShareHopElement extends Base {
   #posterFormat: PosterFormat | null = null;
   /** Increases with every poster request; older requests drop their result. */
   #posterRequest = 0;
+  /** True while a new poster is being drawn (Share/Save are disabled meanwhile). */
+  #posterPending = false;
+  /** The drawing in progress, so a repeat request for the same poster reuses it. */
+  #posterInflight: { key: string; promise: Promise<Blob> } | null = null;
   /** Last generated poster, keyed by its inputs so re-renders don't redraw it. */
   #poster: { key: string; blob: Blob; url: string } | null = null;
 
@@ -173,6 +177,8 @@ export class ShareHopElement extends Base {
     this.#timers.clear();
     if (this.#poster) URL.revokeObjectURL(this.#poster.url);
     this.#poster = null;
+    this.#posterRequest++; // results arriving after removal are dropped
+    this.#posterPending = false;
   }
 
   /** The trigger to return focus to: your slotted button, or the built-in one. */
@@ -436,7 +442,7 @@ export class ShareHopElement extends Base {
         <p class="qr-hint poster-hint">${esc(this.#posterHint(L))}</p>
         <div class="poster-actions">
           <button type="button" class="pill" part="poster-share" data-action="poster-share" hidden>${icons.share}<span>${esc(L.posterShare)}</span></button>
-          <button type="button" class="pill outline" part="poster-save" data-action="poster-save">${icons.download}<span>${esc(L.posterSave)}</span></button>
+          <button type="button" class="pill outline" part="poster-save" data-action="poster-save"${(this.#env ?? detectEnv()).inAppBrowser && (this.#env ?? detectEnv()).mobile ? " hidden" : ""}>${icons.download}<span>${esc(L.posterSave)}</span></button>
         </div>
       </div>
       <div class="url-row" part="url-row">
@@ -640,8 +646,8 @@ export class ShareHopElement extends Base {
     const own = style.getPropertyValue("--sh-poster-accent").trim();
     if (own && safeColor(own)) return own;
     const accent = style.getPropertyValue("--sh-accent").trim();
-    // onColor() answers "white text reads better" only for dark colours.
-    return accent && safeColor(accent) && onColor(accent) === "#fff" ? accent : "#111111";
+    // Use the site accent only if the price and brand stay readable on the white poster.
+    return accent && safeColor(accent) && readableOnWhite(accent) ? accent : "#111111";
   }
 
   /** What goes on the poster: the preview fields, falling back to the share fields. */
@@ -662,10 +668,9 @@ export class ShareHopElement extends Base {
     };
   }
 
-  /** The poster matching the current options, or null while it is (re)generating. */
-  #currentPoster(data: ShareData): { key: string; blob: Blob; url: string } | null {
-    const key = JSON.stringify(this.#posterOptions(data));
-    return this.#poster && this.#poster.key === key ? this.#poster : null;
+  /** The poster on screen, unless a new one is being drawn. */
+  #shownPoster(): { key: string; blob: Blob; url: string } | null {
+    return this.#posterPending ? null : this.#poster;
   }
 
   #setPosterBusy(busy: boolean): void {
@@ -692,22 +697,39 @@ export class ShareHopElement extends Base {
         loading.hidden = false;
         loading.textContent = this.#strings().posterLoading;
       }
+      this.#posterPending = true;
       this.#setPosterBusy(true);
+      // Reuse a drawing of the same poster that is already under way.
+      if (!this.#posterInflight || this.#posterInflight.key !== key) {
+        this.#posterInflight = { key, promise: posterBlob(options) };
+      }
+      const inflight = this.#posterInflight;
       let blob: Blob;
       try {
-        blob = await posterBlob(options);
+        blob = await inflight.promise;
       } catch {
+        if (this.#posterInflight === inflight) this.#posterInflight = null;
         if (isStale()) return null;
+        this.#posterPending = false;
+        // The previous poster is no longer on screen: never share or save it now.
+        if (this.#poster) URL.revokeObjectURL(this.#poster.url);
+        this.#poster = null;
         const failed = q<HTMLElement>(".poster-loading");
         if (failed) failed.textContent = this.#strings().posterFailed;
         const share = q<HTMLElement>('[data-action="poster-share"]');
         if (share) share.hidden = true;
+        // Save stays usable where it is shown: tapping it tries again.
+        this.#setPosterBusy(false);
+        const save = q<HTMLElement>('[data-action="poster-save"]');
+        const hint = q<HTMLElement>(".poster-hint");
+        if (hint) hint.textContent = save && !save.hidden ? this.#strings().posterRetry : "";
         return null;
       }
+      if (this.#posterInflight === inflight) this.#posterInflight = null;
       // A newer request (other format, other item) started meanwhile: drop this one.
       if (isStale()) return null;
-      if (this.#poster) URL.revokeObjectURL(this.#poster.url);
-      this.#poster = { key, blob, url: URL.createObjectURL(blob) };
+      if (this.#poster && this.#poster.key !== key) URL.revokeObjectURL(this.#poster.url);
+      if (!this.#poster || this.#poster.key !== key) this.#poster = { key, blob, url: URL.createObjectURL(blob) };
     }
     const poster = this.#poster;
     // WeChat's browser offers "send to friend / save / scan QR" on long-press
@@ -722,6 +744,7 @@ export class ShareHopElement extends Base {
     }
     const loading = q<HTMLElement>(".poster-loading");
     if (loading) loading.hidden = true;
+    this.#posterPending = false;
     this.#setPosterBusy(false);
 
     // "Share image" only on phones whose share sheet accepts image files: desktop
@@ -731,16 +754,16 @@ export class ShareHopElement extends Base {
       !!file && env.mobile && typeof navigator.canShare === "function" && navigator.canShare({ files: [file] });
     const share = q<HTMLElement>('[data-action="poster-share"]');
     if (share) share.hidden = !canShareFile;
-    // Downloads don't work in in-app browsers (WeChat, Instagram…): press and hold instead.
+    // Downloads don't work in phone in-app browsers (WeChat, Instagram…): press and hold instead.
     const save = q<HTMLElement>('[data-action="poster-save"]');
-    if (save) save.hidden = env.inAppBrowser;
+    if (save) save.hidden = env.inAppBrowser && env.mobile;
     const hint = q<HTMLElement>(".poster-hint");
     if (hint) hint.textContent = this.#posterHint(this.#strings(), canShareFile);
     return poster.blob;
   }
 
   #posterFile(data: ShareData): File | null {
-    const poster = this.#currentPoster(data);
+    const poster = this.#shownPoster();
     if (!poster || typeof File === "undefined") return null;
     return new File([poster.blob], `${slug(data.title) || "share"}.png`, { type: "image/png" });
   }
@@ -764,7 +787,7 @@ export class ShareHopElement extends Base {
 
   async #savePoster(data: ShareData): Promise<void> {
     const url = this.#qrTarget("poster", data.url);
-    const poster = this.#currentPoster(data) ?? ((await this.#fillPoster(data)) ? this.#currentPoster(data) : null);
+    const poster = this.#shownPoster() ?? ((await this.#fillPoster(data)) ? this.#shownPoster() : null);
     if (!poster) {
       this.#emit("sh-poster", { method: "poster-save", url, ok: false });
       return;
@@ -789,9 +812,9 @@ export class ShareHopElement extends Base {
   }
 
   async #download(data: ShareData): Promise<void> {
-    const url = this.#urlFor("qr", data.url);
+    const url = this.#qrTarget("qr", data.url);
     try {
-      const blob = await qrPngBlob(this.#qrTarget("qr", data.url), { scale: 12 });
+      const blob = await qrPngBlob(url, { scale: 12 });
       const href = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = href;
@@ -967,6 +990,36 @@ export class ShareHopElement extends Base {
 
 /** Letters for built-in brands we don't ship a logo for. */
 const MONOGRAMS: Record<string, string> = { linkedin: "in", teams: "T", outlook: "O", slack: "S", band: "B", dingtalk: "D", qzone: "Q" };
+
+/**
+ * Whether a colour stays readable as large text on white (contrast ≥ 3:1).
+ * Any CSS colour syntax works: the browser resolves it on a 1×1 canvas.
+ */
+function readableOnWhite(color: string): boolean {
+  const ctx = globalThis.document?.createElement("canvas").getContext("2d");
+  if (!ctx) return false;
+  ctx.fillStyle = "#010203";
+  ctx.fillStyle = color;
+  const resolved = String(ctx.fillStyle);
+  if (resolved === "#010203" && !/^#010203$/i.test(color.trim())) return false; // not a colour
+  let rgb: number[];
+  let alpha = 1;
+  const hex = /^#([0-9a-f]{6})$/i.exec(resolved)?.[1];
+  if (hex) rgb = [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  else {
+    const parts = /rgba?\(([^)]+)\)/i.exec(resolved)?.[1]?.split(",").map((p) => parseFloat(p));
+    if (!parts || parts.length < 3) return false;
+    rgb = parts.slice(0, 3) as number[];
+    alpha = parts[3] ?? 1;
+  }
+  // Blend a translucent colour with the white background first.
+  const [r, g, b] = rgb.map((v) => {
+    const c = (v * alpha + 255 * (1 - alpha)) / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  }) as [number, number, number];
+  const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  return 1.05 / (luminance + 0.05) >= 3;
+}
 
 /** Black or white, whichever reads better on the given colour (hex only; others get white). */
 function onColor(color: string): string {

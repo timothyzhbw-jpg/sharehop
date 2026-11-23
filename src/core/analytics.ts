@@ -9,11 +9,11 @@ export interface ShareActivity {
   type: ShareActivityType;
   /** What was used: "copy-link", "copy-button", "native", "poster-share", or an app id such as "wechat". */
   channel: string;
-  /** The link that was shared (with UTM tags if enabled). */
+  /** The link that was shared (with UTM tags if enabled); for QR and share-image events, what the QR encodes. */
   url: string;
   ok?: boolean;
   result?: string;
-  /** The widget's share-title. */
+  /** The share title (share-title, or the page's og:title with page-meta). */
   title?: string;
   /** The widget element's id, if it has one (useful when a page has several). */
   widgetId?: string;

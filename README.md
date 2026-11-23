@@ -220,7 +220,7 @@ It is made for apps that don't turn pasted links into cards — WeChat chats and
 - On phones, **Share image** sends it through the system share sheet (WeChat, Instagram, Messages…). It appears only where the browser can share files — not in Android WebViews, so not inside WeChat or Instagram on Android. **Save image** downloads it; the image can also be pressed and held to save.
 - Inside WeChat's browser it is shown as a real image, so press-and-hold offers "send to friend", "save" and "scan QR code". In in-app browsers, where downloads don't work, Save image is hidden and the hint says to press and hold.
 - Users can switch between **4:5** (chats and posts) and **9:16** (Stories) in the panel.
-- The QR code is large, drawn with whole-pixel modules and a 4-module quiet zone. In our tests a ~110-character link still scanned after the image was shrunk to 360 px wide and recompressed as JPEG; longer links make finer modules. Pass `qr-url` with a short link on your own domain for a sturdier code — never a third-party shortener (WeChat treats redirect chains as evasion). `qr-url` is encoded as given, without UTM tags.
+- The QR code is large, drawn with whole-pixel modules and a 4-module quiet zone. The code grows with the link's length. In our tests a ~110-character link still scanned after the image was shrunk to 360 px wide and recompressed as JPEG; links much longer than that may not survive heavy shrinking, so use `qr-url` for them. Pass `qr-url` with a short link on your own domain for a sturdier code — never a third-party shortener (WeChat treats redirect chains as evasion). `qr-url` is encoded as given, without UTM tags.
 - The photo needs CORS (`Access-Control-Allow-Origin`), e.g. public Supabase or S3 buckets; without it the image is drawn without the photo. The price and brand use `--sh-poster-accent`; without it, `--sh-accent` if it is dark enough to read on white, else near-black. Text uses `--sh-poster-font` (the widget waits briefly for it to load).
 
 Without the widget: `posterBlob({ url, title, subtitle, meta, image, brand, format })` returns the PNG.
@@ -296,7 +296,7 @@ Override any built-in text with the `labels` property:
 document.querySelector("share-hop").labels = { copyLink: "Copy store link", qr: "Scan" };
 ```
 
-Keys: `share, heading, copyLink, qr, more, copy, copied, linkCopied, copyFailed, shareFailed, openLink, close, scanHint, download, qrAlt, wechatHint, gotIt, noUrl, copiedOpening, opening, appNotOpened, appNotOpenedCopied, copiedPaste, copiedScan, scanWith, menuHint, wechatHintPoster, wechatScan, wechatScanCopied, poster, posterAlt, posterLoading, posterFailed, posterHint, posterHintMobile, posterHintHold, posterHintWeChat, posterShare, posterSave, posterCaption, posterSize, posterCard, posterStory, posterSquare` (`{app}` is replaced by the app's name).
+Keys: `share, heading, copyLink, qr, more, copy, copied, linkCopied, copyFailed, shareFailed, openLink, close, scanHint, download, qrAlt, wechatHint, gotIt, noUrl, copiedOpening, opening, appNotOpened, appNotOpenedCopied, copiedPaste, copiedScan, scanWith, menuHint, wechatHintPoster, wechatScan, wechatScanCopied, poster, posterAlt, posterLoading, posterFailed, posterHint, posterHintMobile, posterHintHold, posterRetry, posterHintWeChat, posterShare, posterSave, posterCaption, posterSize, posterCard, posterStory, posterSquare` (`{app}` is replaced by the app's name).
 
 ### Methods
 

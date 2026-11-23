@@ -53,7 +53,8 @@ export async function posterCanvas(options: PosterOptions): Promise<HTMLCanvasEl
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("Canvas 2D context is not available");
 
-  const [photo] = await Promise.all([options.image ? loadImage(options.image) : null, fontsReady(doc, font)]);
+  const sample = [options.title, options.subtitle, options.meta, options.brand, options.caption].filter(Boolean).join(" ");
+  const [photo] = await Promise.all([options.image ? loadImage(options.image) : null, fontsReady(doc, font, sample)]);
 
   // Story format: a soft tinted backdrop with the card centred on it.
   let x0 = 0;
@@ -86,8 +87,11 @@ export async function posterCanvas(options: PosterOptions): Promise<HTMLCanvasEl
   let y = y0 + pad;
 
   // QR code: large, with a 4-module quiet zone, so it survives chat apps
-  // shrinking and recompressing the image (see drawQr for module sizing).
-  const qrSize = format === "story" ? 280 : 300;
+  // shrinking and recompressing the image. Longer links have more modules, so
+  // the code grows with them (about 6 px per module, within limits).
+  const matrix = qrMatrix(options.url, "M");
+  const modules = matrix.length + 8;
+  const qrSize = format === "story" ? clamp(modules * 6, 280, 360) : clamp(modules * 6, 300, 400);
   // Photo (cover-cropped, rounded) — or a tinted block when there is none.
   const footerH = qrSize + 40;
   const textH = 56 * 2 + 16 + (options.subtitle ? 84 : 0) + (options.meta ? 56 : 0) + 24;
@@ -129,7 +133,7 @@ export async function posterCanvas(options: PosterOptions): Promise<HTMLCanvasEl
   const footerTop = y0 + h - pad - qrSize;
   ctx.fillStyle = "#ececec";
   ctx.fillRect(innerX, footerTop - 32, innerW, 2);
-  drawQr(ctx, options.url, innerX + innerW - qrSize, footerTop, qrSize);
+  drawQr(ctx, matrix, innerX + innerW - qrSize, footerTop, qrSize);
   const textW = innerW - qrSize - 32;
   let fy = footerTop + Math.max(24, qrSize / 2 - 70);
   if (options.brand) {
@@ -216,8 +220,11 @@ function fit(ctx: CanvasRenderingContext2D, text: string, width: number): string
   return wrap(ctx, text, width, 1)[0] ?? "";
 }
 
-function drawQr(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, size: number): void {
-  const matrix = qrMatrix(text, "M");
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+function drawQr(ctx: CanvasRenderingContext2D, matrix: boolean[][], x: number, y: number, size: number): void {
   const quiet = 4;
   const total = matrix.length + quiet * 2;
   // Whole pixels per module keep edges sharp; prefer even sizes (they stay sharp
@@ -263,33 +270,44 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
  */
 async function loadImage(src: string): Promise<HTMLImageElement | null> {
   const first = await loadOnce(src);
-  if (first || !/^https?:\/\//i.test(src)) return first;
-  return loadOnce(`${src}${src.includes("?") ? "&" : "?"}sh-cors=1`);
+  // Retry only a failed load (CORS or a cached non-CORS copy), not a timeout:
+  // a host that hangs would just hang again.
+  if (first.img || first.reason === "timeout" || !/^https?:\/\//i.test(src)) return first.img;
+  return (await loadOnce(withParam(src, "sh-cors", "1"))).img;
 }
 
-function loadOnce(src: string): Promise<HTMLImageElement | null> {
+/** Add a query parameter before any #fragment. */
+function withParam(url: string, name: string, value: string): string {
+  const hash = url.indexOf("#");
+  const base = hash >= 0 ? url.slice(0, hash) : url;
+  const fragment = hash >= 0 ? url.slice(hash) : "";
+  return `${base}${base.includes("?") ? "&" : "?"}${name}=${value}${fragment}`;
+}
+
+function loadOnce(src: string): Promise<{ img: HTMLImageElement | null; reason?: "error" | "timeout" }> {
   return new Promise((resolve) => {
     const img = new Image();
     img.crossOrigin = "anonymous";
     img.decoding = "async";
-    const timer = setTimeout(() => resolve(null), 8000);
+    const timer = setTimeout(() => resolve({ img: null, reason: "timeout" }), 8000);
     img.onload = () => {
       clearTimeout(timer);
-      resolve(img);
+      resolve({ img });
     };
     img.onerror = () => {
       clearTimeout(timer);
-      resolve(null);
+      resolve({ img: null, reason: "error" });
     };
     img.src = src;
   });
 }
 
 /** Wait (up to ~1.5 s) for the poster's font weights so canvas text doesn't fall back. */
-function fontsReady(doc: Document, font: string): Promise<void> {
-  const fonts = (doc as Document & { fonts?: { load(font: string): Promise<unknown> } }).fonts;
+function fontsReady(doc: Document, font: string, text: string): Promise<void> {
+  const fonts = (doc as Document & { fonts?: { load(font: string, text?: string): Promise<unknown> } }).fonts;
   if (!fonts) return Promise.resolve();
-  const loads = ["400 32px", "700 52px", "800 64px"].map((w) => fonts.load(`${w} ${font}`).catch(() => undefined));
+  // Passing the text makes fonts split by unicode-range (CJK, Cyrillic) load the parts we draw.
+  const loads = ["400 32px", "700 52px", "800 64px"].map((w) => fonts.load(`${w} ${font}`, text || undefined).catch(() => undefined));
   return Promise.race([Promise.all(loads).then(() => undefined), new Promise<void>((r) => setTimeout(r, 1500))]);
 }
 

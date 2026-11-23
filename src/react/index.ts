@@ -34,7 +34,7 @@ export interface ShareHopProps {
   brandName?: string;
   /** Share image size: "card" 4:5 (default), "story" 9:16, "square". */
   posterFormat?: "card" | "story" | "square";
-  /** What QR codes encode (default: the share link). A short link on your own domain scans best. */
+  /** What QR codes encode, as given — no UTM tags (default: the share link). A short link on your own domain scans best. */
   qrUrl?: string;
   /** Your own trigger button for mode="button" (e.g. your design system's Button). */
   trigger?: ReactNode;
